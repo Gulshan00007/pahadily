@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: pahadily-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13
+      - key: DATABASE_URL
+        sync: false
+      - key: FRONTEND_URLS
+        sync: false
