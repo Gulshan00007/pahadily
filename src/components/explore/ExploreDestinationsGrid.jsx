@@ -219,6 +219,7 @@ function ExploreDestinationsGrid({
   viewMode,
   setViewMode,
   searchQuery,
+  onResetFilters,
 }) {
   const [destinations, setDestinations] = useState(FALLBACK_DESTINATIONS);
   const [loading, setLoading] = useState(true);
@@ -229,7 +230,7 @@ function ExploreDestinationsGrid({
         setLoading(true);
         const isCategoryFilter = activeFilter === "homestay" || activeFilter === "campsite";
         const params = {
-          q: searchQuery,
+          q: searchQuery || undefined,
         };
         if (isCategoryFilter) {
           params.category = activeFilter;
@@ -240,6 +241,8 @@ function ExploreDestinationsGrid({
         const data = await getPlaces(params);
         if (data && data.length > 0) {
           setDestinations(data);
+        } else if (!searchQuery && activeFilter === "all") {
+          setDestinations(FALLBACK_DESTINATIONS);
         } else {
           // If backend returns empty, filter fallback data locally
           let filtered = FALLBACK_DESTINATIONS;
@@ -248,13 +251,15 @@ function ExploreDestinationsGrid({
           } else if (activeFilter !== "all") {
             filtered = filtered.filter((d) => d.region === activeFilter);
           }
-          if (searchQuery) {
-            const q = searchQuery.toLowerCase();
+          if (searchQuery && searchQuery.trim()) {
+            const q = searchQuery.trim().toLowerCase();
             filtered = filtered.filter(
               (d) =>
-                d.name.toLowerCase().includes(q) ||
-                d.tagline.toLowerCase().includes(q) ||
-                d.region.toLowerCase().includes(q)
+                d.name?.toLowerCase().includes(q) ||
+                d.tagline?.toLowerCase().includes(q) ||
+                d.region?.toLowerCase().includes(q) ||
+                d.description?.toLowerCase().includes(q) ||
+                (Array.isArray(d.tags) && d.tags.some((t) => t.toLowerCase().includes(q)))
             );
           }
           setDestinations(filtered);
@@ -266,6 +271,17 @@ function ExploreDestinationsGrid({
           filtered = filtered.filter((d) => d.category === activeFilter);
         } else if (activeFilter !== "all") {
           filtered = filtered.filter((d) => d.region === activeFilter);
+        }
+        if (searchQuery && searchQuery.trim()) {
+          const q = searchQuery.trim().toLowerCase();
+          filtered = filtered.filter(
+            (d) =>
+              d.name?.toLowerCase().includes(q) ||
+              d.tagline?.toLowerCase().includes(q) ||
+              d.region?.toLowerCase().includes(q) ||
+              d.description?.toLowerCase().includes(q) ||
+              (Array.isArray(d.tags) && d.tags.some((t) => t.toLowerCase().includes(q)))
+          );
         }
         setDestinations(filtered);
       } finally {
@@ -391,7 +407,17 @@ function ExploreDestinationsGrid({
         <div className="ep-empty-state">
           <div className="ep-empty-icon">🏔️</div>
           <h3>No mountain stays found</h3>
-          <p>Try clearing your search query or selecting "All Stays" to view all sanctuaries.</p>
+          <p>Try clearing your search query or selecting &ldquo;All Stays&rdquo; to view all sanctuaries.</p>
+          {onResetFilters && (
+            <button
+              type="button"
+              className="hero-search-btn"
+              style={{ marginTop: "1rem" }}
+              onClick={onResetFilters}
+            >
+              Reset Search & Filters
+            </button>
+          )}
         </div>
       ) : (
         <div className={`ep-stays-grid${viewMode === "list" ? " list-layout" : ""}`}>

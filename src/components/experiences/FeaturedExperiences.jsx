@@ -191,44 +191,111 @@ function ExperienceCard({ exp }) {
   );
 }
 
-function FeaturedExperiences() {
+function FeaturedExperiences({ searchQuery = "", setSearchQuery, activeFilter = "all", setActiveFilter }) {
   const [experiences, setExperiences] = useState(FALLBACK_EXPERIENCES);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     async function loadExperiences() {
       try {
         setLoading(true);
-        const data = await getExperiences();
+        const data = await getExperiences({
+          category: activeFilter === "all" ? undefined : activeFilter,
+          q: searchQuery || undefined,
+        });
         if (data && data.length > 0) {
           setExperiences(data);
+        } else if (!searchQuery && activeFilter === "all") {
+          setExperiences(FALLBACK_EXPERIENCES);
+        } else {
+          setExperiences([]);
         }
       } catch (err) {
         console.warn("Using fallback experiences:", err);
+        setExperiences(FALLBACK_EXPERIENCES);
       } finally {
         setLoading(false);
       }
     }
     loadExperiences();
-  }, []);
+  }, [activeFilter, searchQuery]);
+
+  // Client-side real-time filter
+  const filteredExperiences = experiences.filter((exp) => {
+    const matchCategory =
+      activeFilter === "all" ||
+      exp.category?.toLowerCase() === activeFilter.toLowerCase() ||
+      (activeFilter === "local-life" && exp.category?.toLowerCase().includes("culture"));
+    
+    if (!matchCategory) return false;
+
+    if (searchQuery && searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      const titleMatch = exp.title?.toLowerCase().includes(q);
+      const locMatch = exp.location?.toLowerCase().includes(q);
+      const guideMatch = exp.guide?.toLowerCase().includes(q);
+      const descMatch = exp.description?.toLowerCase().includes(q);
+      const diffMatch = exp.difficulty?.toLowerCase().includes(q);
+      const catMatch = exp.category?.toLowerCase().includes(q);
+      const incMatch = Array.isArray(exp.inclusions)
+        ? exp.inclusions.some((i) => i.toLowerCase().includes(q))
+        : false;
+
+      return titleMatch || locMatch || guideMatch || descMatch || diffMatch || catMatch || incMatch;
+    }
+
+    return true;
+  });
+
+  const isFiltering = activeFilter !== "all" || searchQuery.trim().length > 0;
 
   return (
-    <section className="featured-exp-section section-container">
+    <section className="featured-exp-section section-container" id="browse-all">
       <div className="featured-exp-header">
         <div>
-          <h2 className="featured-exp-title">Featured Mountain Experiences</h2>
-          <p className="featured-exp-subtitle">Handpicked slow journeys and trails guided by native locals</p>
+          <h2 className="featured-exp-title">
+            {activeFilter !== "all"
+              ? `${activeFilter.charAt(0).toUpperCase() + activeFilter.slice(1)} Experiences`
+              : "Featured Mountain Experiences"}
+          </h2>
+          <p className="featured-exp-subtitle">
+            Handpicked slow journeys and trails guided by native locals
+          </p>
         </div>
-        <a href="#browse-all" className="view-all-btn" aria-label="View all experiences">
-          Explore All ({experiences.length}) <span className="btn-arrow">↓</span>
-        </a>
+        <div className="view-all-btn" aria-label="Experience count">
+          Found <strong>{filteredExperiences.length}</strong> experience{filteredExperiences.length === 1 ? "" : "s"}
+        </div>
       </div>
 
-      <div className="featured-exp-grid">
-        {experiences.map((exp) => (
-          <ExperienceCard key={exp.id} exp={exp} />
-        ))}
-      </div>
+      {loading && experiences.length === 0 ? (
+        <div className="ep-loading-state">
+          <div className="ep-loading-spinner" />
+          <p>Loading curated Himalayan experiences...</p>
+        </div>
+      ) : filteredExperiences.length === 0 ? (
+        <div className="ep-empty-state" style={{ margin: "2rem 0", padding: "3rem 1.5rem" }}>
+          <div className="ep-empty-icon">🏔️</div>
+          <h3>No experiences found matching your search</h3>
+          <p>Try searching for a different activity, location (e.g. Jibhi, Tirthan), or clear your search.</p>
+          <button
+            type="button"
+            className="hero-search-btn"
+            style={{ marginTop: "1rem" }}
+            onClick={() => {
+              if (setSearchQuery) setSearchQuery("");
+              if (setActiveFilter) setActiveFilter("all");
+            }}
+          >
+            Reset Search & Filters
+          </button>
+        </div>
+      ) : (
+        <div className="featured-exp-grid">
+          {filteredExperiences.map((exp) => (
+            <ExperienceCard key={exp.id} exp={exp} />
+          ))}
+        </div>
+      )}
     </section>
   );
 }

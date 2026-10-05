@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import LocalsHero from "../components/locals/LocalsHero";
@@ -10,13 +11,44 @@ import LocalProfileModal from "../components/locals/LocalProfileModal";
 import LocalsJoinCTA from "../components/locals/LocalsJoinCTA";
 
 function LocalsPage() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [activeFilter, setActiveFilter] = useState("all");
-  const [activeRegion, setActiveRegion] = useState("all");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialCategory = searchParams.get("category") || searchParams.get("filter") || "all";
+  const initialRegion = searchParams.get("region") || "all";
+  const initialQuery = searchParams.get("q") || "";
+
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
+  const [activeFilter, setActiveFilter] = useState(initialCategory);
+  const [activeRegion, setActiveRegion] = useState(initialRegion);
   const [selectedLocal, setSelectedLocal] = useState(null);
+
+  useEffect(() => {
+    const cat = searchParams.get("category") || searchParams.get("filter");
+    if (cat && cat !== activeFilter) setActiveFilter(cat);
+    const reg = searchParams.get("region");
+    if (reg && reg !== activeRegion) setActiveRegion(reg);
+    const q = searchParams.get("q");
+    if (q !== null && q !== searchQuery) setSearchQuery(q);
+  }, [searchParams]);
 
   const handleSelectRegion = (regionId) => {
     setActiveRegion(regionId);
+    if (regionId === "all") searchParams.delete("region");
+    else searchParams.set("region", regionId);
+    setSearchParams(searchParams, { replace: true });
+  };
+
+  const handleFilterChange = (catId) => {
+    setActiveFilter(catId);
+    if (catId === "all") searchParams.delete("category");
+    else searchParams.set("category", catId);
+    setSearchParams(searchParams, { replace: true });
+  };
+
+  const handleSearchChange = (query) => {
+    setSearchQuery(query);
+    if (!query) searchParams.delete("q");
+    else searchParams.set("q", query);
+    setSearchParams(searchParams, { replace: true });
   };
 
   return (
@@ -26,9 +58,9 @@ function LocalsPage() {
         {/* Hero Section */}
         <LocalsHero
           searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
+          setSearchQuery={handleSearchChange}
           activeFilter={activeFilter}
-          setActiveFilter={setActiveFilter}
+          setActiveFilter={handleFilterChange}
         />
 
         {/* Stats Bar */}
@@ -49,6 +81,11 @@ function LocalsPage() {
                 searchQuery={searchQuery}
                 activeRegion={activeRegion}
                 onSelectLocal={setSelectedLocal}
+                onResetFilters={() => {
+                  handleSearchChange("");
+                  handleFilterChange("all");
+                  handleSelectRegion("all");
+                }}
               />
             </div>
             <aside className="locals-map-col">

@@ -36,7 +36,14 @@ function LocalsHero({ searchQuery, setSearchQuery, activeFilter, setActiveFilter
         </p>
 
         <div className="locals-search-wrap">
-          <div className="explore-search-bar">
+          <form
+            className="explore-search-bar"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const el = document.querySelector(".locals-content-section");
+              if (el) el.scrollIntoView({ behavior: "smooth" });
+            }}
+          >
             <span className="explore-search-icon">
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#5a7060" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -45,13 +52,23 @@ function LocalsHero({ searchQuery, setSearchQuery, activeFilter, setActiveFilter
             <input
               type="text"
               className="explore-search-input"
-              placeholder="Search locals, places, or interests..."
+              placeholder="Search guides, companions, drivers, storytellers..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               aria-label="Search locals"
             />
-            <button className="explore-search-btn">Search</button>
-          </div>
+            {searchQuery && (
+              <button
+                type="button"
+                className="explore-search-clear-btn"
+                onClick={() => setSearchQuery("")}
+                aria-label="Clear search"
+              >
+                ✕
+              </button>
+            )}
+            <button type="submit" className="explore-search-btn">Search</button>
+          </form>
         </div>
 
         <div className="explore-filter-tabs" role="tablist">

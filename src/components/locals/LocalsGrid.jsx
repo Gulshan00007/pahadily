@@ -671,7 +671,13 @@ function BottomSections({ locals, onSelect }) {
 /* ──────────────────────────────────────────────────────────────────
    MAIN EXPORT
 ────────────────────────────────────────────────────────────────── */
-function LocalsGrid({ activeFilter = "all", searchQuery = "", activeRegion = "all", onSelectLocal }) {
+function LocalsGrid({
+  activeFilter = "all",
+  searchQuery = "",
+  activeRegion = "all",
+  onSelectLocal,
+  onResetFilters,
+}) {
   const [localsList, setLocalsList] = useState(ALL_LOCALS);
   const [loading, setLoading] = useState(false);
 
@@ -682,7 +688,7 @@ function LocalsGrid({ activeFilter = "all", searchQuery = "", activeRegion = "al
         const data = await getLocals({
           category: activeFilter === "all" ? undefined : activeFilter,
           region: activeRegion === "all" ? undefined : activeRegion,
-          q: searchQuery,
+          q: searchQuery || undefined,
         });
         if (data && data.length > 0) {
           setLocalsList(data);
@@ -711,6 +717,8 @@ function LocalsGrid({ activeFilter = "all", searchQuery = "", activeRegion = "al
       l.name.toLowerCase().includes(query) ||
       l.location.toLowerCase().includes(query) ||
       l.role.toLowerCase().includes(query) ||
+      (l.bio && l.bio.toLowerCase().includes(query)) ||
+      (l.lang && l.lang.toLowerCase().includes(query)) ||
       tagsArr.some((t) => t.toLowerCase().includes(query));
     return matchCategory && matchRegion && matchSearch;
   });
@@ -744,6 +752,16 @@ function LocalsGrid({ activeFilter = "all", searchQuery = "", activeRegion = "al
             <div className="empty-icon">🏔️</div>
             <h3>No locals found for this criteria</h3>
             <p>Try selecting &ldquo;All Regions&rdquo; or clearing your search keywords.</p>
+            {onResetFilters && (
+              <button
+                type="button"
+                className="hero-search-btn"
+                style={{ marginTop: "1rem" }}
+                onClick={onResetFilters}
+              >
+                Reset Search & Region
+              </button>
+            )}
           </div>
         ) : (
           <div className="local-cards-grid flat-grid">

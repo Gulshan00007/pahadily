@@ -68,6 +68,10 @@ function ExplorePage() {
                 viewMode={viewMode}
                 setViewMode={setViewMode}
                 searchQuery={searchQuery}
+                onResetFilters={() => {
+                  handleSearchChange("");
+                  handleFilterChange("all");
+                }}
               />
             </div>
             <aside className="explore-map-col">

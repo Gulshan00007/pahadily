@@ -35,7 +35,14 @@ function ExploreHero({ searchQuery, setSearchQuery, activeFilter, setActiveFilte
 
         {/* Search Bar */}
         <div className="explore-search-wrap">
-          <div className="explore-search-bar">
+          <form
+            className="explore-search-bar"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const el = document.querySelector(".explore-content-section");
+              if (el) el.scrollIntoView({ behavior: "smooth" });
+            }}
+          >
             <span className="explore-search-icon">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2a4536" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="11" cy="11" r="8" />
@@ -60,10 +67,10 @@ function ExploreHero({ searchQuery, setSearchQuery, activeFilter, setActiveFilte
                 ✕
               </button>
             )}
-            <button className="explore-search-btn" aria-label="Search">
+            <button type="submit" className="explore-search-btn" aria-label="Search">
               Search Stays
             </button>
-          </div>
+          </form>
         </div>
 
         {/* Filter Tabs */}

@@ -73,7 +73,15 @@ const CATEGORIES = [
   },
 ];
 
-function ExploreByExperience() {
+function ExploreByExperience({ activeFilter, setActiveFilter }) {
+  const handleCategoryClick = (catId) => {
+    if (setActiveFilter) {
+      setActiveFilter(catId);
+      const el = document.querySelector(".featured-exp-section");
+      if (el) el.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
   return (
     <section className="exp-by-category-section section-container">
       <div className="exp-by-category-header">
@@ -82,21 +90,29 @@ function ExploreByExperience() {
       </div>
 
       <div className="exp-category-grid">
-        {CATEGORIES.map((cat) => (
-          <button
-            key={cat.id}
-            className="exp-category-card"
-            style={{ backgroundColor: cat.bg }}
-            aria-label={`Explore ${cat.label} experiences`}
-          >
-            <span className="exp-category-icon" style={{ color: cat.iconColor }}>
-              {cat.icon}
-            </span>
-            <span className="exp-category-label" style={{ color: cat.iconColor }}>
-              {cat.label}
-            </span>
-          </button>
-        ))}
+        {CATEGORIES.map((cat) => {
+          const isActive = activeFilter === cat.id;
+          return (
+            <button
+              key={cat.id}
+              type="button"
+              className={`exp-category-card${isActive ? " active" : ""}`}
+              style={{
+                backgroundColor: cat.bg,
+                outline: isActive ? `2px solid ${cat.iconColor}` : "none",
+              }}
+              onClick={() => handleCategoryClick(cat.id)}
+              aria-label={`Explore ${cat.label} experiences`}
+            >
+              <span className="exp-category-icon" style={{ color: cat.iconColor }}>
+                {cat.icon}
+              </span>
+              <span className="exp-category-label" style={{ color: cat.iconColor }}>
+                {cat.label}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </section>
   );

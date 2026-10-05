@@ -81,6 +81,7 @@ function AdminPage() {
     host_name: "",
   });
   const [editingPlaceId, setEditingPlaceId] = useState(null);
+  const [placeSearchQuery, setPlaceSearchQuery] = useState("");
 
   // Locals state
   const [locals, setLocals] = useState([]);
@@ -103,6 +104,7 @@ function AdminPage() {
     email: "",
   });
   const [editingLocalId, setEditingLocalId] = useState(null);
+  const [localSearchQuery, setLocalSearchQuery] = useState("");
 
   // Experiences state
   const [experiences, setExperiences] = useState([]);
@@ -121,6 +123,7 @@ function AdminPage() {
     inclusions: "Guided Walk, Herbal Tea, Nature Lore",
   });
   const [editingExpId, setEditingExpId] = useState(null);
+  const [expSearchQuery, setExpSearchQuery] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [formSubmitting, setFormSubmitting] = useState(false);
@@ -1306,7 +1309,17 @@ function AdminPage() {
 
               {/* Places List Table */}
               <div className="admin-items-list-card">
-                <h3>Live Sanctuaries ({places.length})</h3>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "1rem" }}>
+                  <h3 style={{ margin: 0 }}>Live Sanctuaries ({places.length})</h3>
+                  <input
+                    type="text"
+                    placeholder="Search sanctuary, region, tagline..."
+                    value={placeSearchQuery}
+                    onChange={(e) => setPlaceSearchQuery(e.target.value)}
+                    className="admin-search-input"
+                    style={{ maxWidth: "300px" }}
+                  />
+                </div>
                 <div className="table-responsive">
                   <table className="admin-table full-width">
                     <thead>
@@ -1321,7 +1334,18 @@ function AdminPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {places.map((p) => (
+                      {places
+                        .filter((p) => {
+                          if (!placeSearchQuery.trim()) return true;
+                          const q = placeSearchQuery.toLowerCase();
+                          return (
+                            p.name?.toLowerCase().includes(q) ||
+                            p.tagline?.toLowerCase().includes(q) ||
+                            p.region?.toLowerCase().includes(q) ||
+                            p.category?.toLowerCase().includes(q)
+                          );
+                        })
+                        .map((p) => (
                         <tr key={p.id}>
                           <td><strong>#{p.id}</strong></td>
                           <td>
@@ -1432,7 +1456,17 @@ function AdminPage() {
               </div>
 
               <div className="admin-items-list-card">
-                <h3>Curated Experiences ({experiences.length})</h3>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "1rem" }}>
+                  <h3 style={{ margin: 0 }}>Curated Experiences ({experiences.length})</h3>
+                  <input
+                    type="text"
+                    placeholder="Search experiences, guide..."
+                    value={expSearchQuery}
+                    onChange={(e) => setExpSearchQuery(e.target.value)}
+                    className="admin-search-input"
+                    style={{ maxWidth: "300px" }}
+                  />
+                </div>
                 <div className="table-responsive">
                   <table className="admin-table full-width">
                     <thead>
@@ -1446,7 +1480,18 @@ function AdminPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {experiences.map((exp) => (
+                      {experiences
+                        .filter((exp) => {
+                          if (!expSearchQuery.trim()) return true;
+                          const q = expSearchQuery.toLowerCase();
+                          return (
+                            exp.title?.toLowerCase().includes(q) ||
+                            exp.guide?.toLowerCase().includes(q) ||
+                            exp.region?.toLowerCase().includes(q) ||
+                            exp.category?.toLowerCase().includes(q)
+                          );
+                        })
+                        .map((exp) => (
                         <tr key={exp.id}>
                           <td><strong>#{exp.id}</strong></td>
                           <td><strong>{exp.title}</strong></td>
@@ -1558,7 +1603,17 @@ function AdminPage() {
               </div>
 
               <div className="admin-items-list-card">
-                <h3>Verified Native Guides & Artisans ({locals.length})</h3>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "1rem" }}>
+                  <h3 style={{ margin: 0 }}>Verified Native Guides & Artisans ({locals.length})</h3>
+                  <input
+                    type="text"
+                    placeholder="Search guides, role, region..."
+                    value={localSearchQuery}
+                    onChange={(e) => setLocalSearchQuery(e.target.value)}
+                    className="admin-search-input"
+                    style={{ maxWidth: "300px" }}
+                  />
+                </div>
                 <div className="table-responsive">
                   <table className="admin-table full-width">
                     <thead>
@@ -1572,7 +1627,18 @@ function AdminPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {locals.map((l) => (
+                      {locals
+                        .filter((l) => {
+                          if (!localSearchQuery.trim()) return true;
+                          const q = localSearchQuery.toLowerCase();
+                          return (
+                            l.name?.toLowerCase().includes(q) ||
+                            l.role?.toLowerCase().includes(q) ||
+                            l.region?.toLowerCase().includes(q) ||
+                            l.location?.toLowerCase().includes(q)
+                          );
+                        })
+                        .map((l) => (
                         <tr key={l.id}>
                           <td><strong>#{l.id}</strong></td>
                           <td><strong>{l.name}</strong></td>
