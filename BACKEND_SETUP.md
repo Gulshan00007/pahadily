@@ -12,15 +12,14 @@ A full-stack, production-ready prototype for **Pahadíly** — Rare Places, Real
 
 ---
 
-## ⚡ Demo Accounts (1-Click Login Built-In)
-
-You can log in instantly using the demo buttons in the login modal, or with these credentials:
+## ⚡ Super Admin & Demo Accounts
 
 | Role | Email | Password | Permissions |
 |---|---|---|---|
-| **Admin** | `admin@pahadily.com` | `pahadily123` | Add/Edit/Delete Places, Persons, Experiences & Manage All Bookings |
-| **Host** | `host@pahadily.com` | `pahadily123` | Host dashboard, add stays/experiences |
-| **Traveler** | `traveler@pahadily.com` | `pahadily123` | Book stays, experiences & view "My Bookings" |
+| **Super Admin (Owner)** | `gulshany0001@gmail.com` | `Tgulshan@2` | Full master administrator control over all bookings, users, finances, and listings |
+| **Mountain Host** | `host@pahadily.com` | `pahadily123` | Host dashboard, publish sanctuaries/experiences |
+| **Conscious Traveler** | `traveler@pahadily.com` | `pahadily123` | Book stays & experiences, manage "My Bookings" |
+
 
 ---
 
@@ -74,3 +73,28 @@ Open `http://localhost:5173` or `http://localhost:5174`.
 - **Locals**: `GET /api/locals`, `POST /api/locals`, `PUT /api/locals/{id}`, `DELETE /api/locals/{id}`
 - **Bookings**: `POST /api/bookings`, `GET /api/bookings`, `GET /api/bookings/my`, `PATCH /api/bookings/{id}/status`
 - **Stats**: `GET /api/stats`
+
+---
+
+## ☁️ Deploying Backend on Render (Render.com)
+
+1. Sign into **[Render.com](https://render.com)** with GitHub.
+2. Click **New +** → **Web Service** (or **Blueprint** to use `render.yaml`).
+3. Select your repository: `Gulshan00007/pahadily`.
+4. Configure the Web Service settings:
+   - **Name**: `pahadily-api`
+   - **Root Directory**: `backend`
+   - **Runtime**: `Python`
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+   - **Health Check Path**: `/healthz`
+5. **Environment Variables**:
+   - `PYTHON_VERSION`: `3.11.9`
+   - `JWT_SECRET`: `pahadily_secret_mountain_key_2026_super_secure`
+6. Click **Deploy Web Service**.
+7. Copy your Render service URL (e.g., `https://pahadily-api.onrender.com`).
+8. In **Vercel** (`pahadily.vercel.app`):
+   - Go to **Project Settings** → **Environment Variables**
+   - Add: `VITE_API_URL` = `https://pahadily-api.onrender.com`
+   - Redeploy frontend on Vercel so it connects directly to your live Render backend!
+
