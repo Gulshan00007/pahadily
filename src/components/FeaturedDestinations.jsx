@@ -89,7 +89,6 @@ function FeaturedDestinations() {
                 <a
                   href={dest.region ? `/book-stay?valley=${dest.region}` : "/explore"}
                   className="destination-text"
-                  style={{ textDecoration: "none", color: "inherit" }}
                 >
                   <h3 className="destination-name">{dest.name}</h3>
                   <p className="destination-desc">{dest.tagline}</p>
