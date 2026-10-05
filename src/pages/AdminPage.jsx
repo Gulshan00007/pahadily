@@ -596,15 +596,9 @@ function AdminPage() {
               </div>
 
               <button type="submit" disabled={gateSubmitting} className="admin-gate-btn">
-                {gateSubmitting ? "Authenticating..." : "Unlock Control Center →"}
+                {gateSubmitting ? "Authenticating..." : "Unlock Operations Center →"}
               </button>
             </form>
-
-            <div className="admin-gate-demo-hint">
-              <p>Demo Accounts:</p>
-              <code>admin@pahadily.com</code> (Password: <code>pahadily123</code>)<br />
-              <code>host@pahadily.com</code> (Password: <code>pahadily123</code>)
-            </div>
           </div>
         </main>
         <Footer />

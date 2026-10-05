@@ -69,13 +69,20 @@ st, me_res = req("/api/auth/me", token=token)
 assert st == 200 and me_res["email"] == test_email, f"Me check failed: {st} {me_res}"
 print(" [PASS] 4. Session Token Verification (/api/auth/me)")
 
-# 5. Demo Logins
-for r in ["traveler", "host", "admin"]:
+# 5. Traveler and Host Demo Logins
+for r in ["traveler", "host"]:
     st, d_res = req(f"/api/auth/demo-login?role={r}", method="POST")
     assert st == 200 and d_res["user"]["role"] == r, f"Demo {r} failed: {st} {d_res}"
     print(f" [PASS] 5. 1-Click Demo Login: [{r.upper()}] ({d_res['user']['full_name']})")
 
-admin_token = req("/api/auth/demo-login?role=admin", method="POST")[1]["token"]
+# Verify Protected Super Admin Login
+st, admin_login = req("/api/auth/login", method="POST", data={
+    "email": "gulshany0001@gmail.com",
+    "password": "Tgulshan@2"
+})
+assert st == 200 and admin_login["user"]["role"] == "admin", f"Admin login failed: {st} {admin_login}"
+admin_token = admin_login["token"]
+print(f" [PASS] 5. Super Admin Direct Authentication ({admin_login['user']['full_name']} / {admin_login['user']['role']})")
 
 # 6. User Management Endpoints (Admin)
 st, users_list = req("/api/users", token=admin_token)

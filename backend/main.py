@@ -565,10 +565,33 @@ app.add_middleware(
 
 
 def seed_database(db: Session):
-    # Seed default users
-    if db.scalar(select(User.id).limit(1)) is None:
+    # Ensure Super Admin Account (Gulshan) exists and is up to date
+    admin_user = db.scalar(select(User).where(User.email == "gulshany0001@gmail.com"))
+    admin_h, admin_s = hash_password("Tgulshan@2")
+    if not admin_user:
+        db.add(User(
+            email="gulshany0001@gmail.com",
+            password_hash=admin_h,
+            salt=admin_s,
+            full_name="Gulshan (Owner & Admin)",
+            role="admin",
+            phone="+91 98160 00001",
+            bio="Platform Owner & Master Administrator",
+            is_active=True,
+            is_verified=True,
+        ))
+        db.commit()
+    else:
+        admin_user.password_hash = admin_h
+        admin_user.salt = admin_s
+        admin_user.role = "admin"
+        admin_user.is_active = True
+        admin_user.is_verified = True
+        db.commit()
+
+    # Seed default demonstration travelers & hosts if empty
+    if db.scalar(select(User.id).where(User.role != "admin").limit(1)) is None:
         demo_users = [
-            ("admin@pahadily.com", "pahadily123", "Pahadíly Admin", "admin", "+91 98160 00001", "Platform Administrator"),
             ("host@pahadily.com", "pahadily123", "Karan Negi (Host)", "host", "+91 98160 00002", "Native Mountain Host in Tirthan"),
             ("traveler@pahadily.com", "pahadily123", "Aarav Sharma", "traveler", "+91 98160 00003", "Conscious Himalayan Traveler"),
         ]
@@ -581,7 +604,9 @@ def seed_database(db: Session):
                 full_name=name,
                 role=role,
                 phone=phone,
-                bio=bio
+                bio=bio,
+                is_active=True,
+                is_verified=True,
             ))
         db.commit()
 
@@ -828,10 +853,14 @@ def login(payload: UserLogin, db: Session = Depends(get_db)):
 
 @app.post("/api/auth/demo-login", response_model=AuthResponse, tags=["auth"])
 def demo_login(role: str = Query(default="traveler"), db: Session = Depends(get_db)):
-    target_email = "traveler@pahadily.com"
     if role == "admin":
-        target_email = "admin@pahadily.com"
-    elif role == "host":
+        raise HTTPException(
+            status_code=403,
+            detail="Admin access is protected. Please log in with administrator email and password."
+        )
+
+    target_email = "traveler@pahadily.com"
+    if role == "host":
         target_email = "host@pahadily.com"
 
     user = db.scalar(select(User).where(User.email == target_email))
