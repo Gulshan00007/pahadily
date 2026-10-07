@@ -1,12 +1,15 @@
 const FILTER_TABS = [
-  { id: "all", label: "All Stays & Camps", icon: "🏔️" },
+  { id: "all", label: "All Valleys & Stays", icon: "🏔️" },
+  { id: "spiti", label: "Spiti Cold Desert", icon: "❄️" },
+  { id: "tirthan", label: "Tirthan & GHNP", icon: "🌊" },
+  { id: "chopta", label: "Chopta Meadows", icon: "🌿" },
+  { id: "kinnaur", label: "Kinnaur & Sangla", icon: "🍎" },
+  { id: "jibhi", label: "Jibhi & Banjar", icon: "🌲" },
+  { id: "parvati", label: "Parvati Hamlets", icon: "🍃" },
+  { id: "zanskar", label: "Zanskar Frontier", icon: "🏔️" },
+  { id: "pangi", label: "Pangi & Sach Pass", icon: "⛰️" },
   { id: "homestay", label: "Heritage Homestays", icon: "🏡" },
   { id: "campsite", label: "Campsites & Glamping", icon: "⛺" },
-  { id: "tirthan", label: "Tirthan Valley", icon: "🌊" },
-  { id: "jibhi", label: "Jibhi Pine Woods", icon: "🌲" },
-  { id: "spiti", label: "Spiti High Pass", icon: "❄️" },
-  { id: "kasol", label: "Kasol & Chalal", icon: "🍃" },
-  { id: "pangi", label: "Pangi Remote", icon: "⛰️" },
 ];
 
 function ExploreHero({ searchQuery, setSearchQuery, activeFilter, setActiveFilter }) {
@@ -14,7 +17,10 @@ function ExploreHero({ searchQuery, setSearchQuery, activeFilter, setActiveFilte
     <div className="explore-hero">
       <div
         className="explore-hero-bg"
-        style={{ backgroundImage: "url('/images/destinations/spiti-valley.jpg')" }}
+        style={{
+          backgroundImage:
+            "url('https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=2000&q=85')",
+        }}
       >
         <div className="explore-hero-overlay" />
       </div>
@@ -24,13 +30,13 @@ function ExploreHero({ searchQuery, setSearchQuery, activeFilter, setActiveFilte
         <nav className="explore-breadcrumb" aria-label="Breadcrumb">
           <a href="/" className="breadcrumb-link">Home</a>
           <span className="breadcrumb-sep">&#8250;</span>
-          <span className="breadcrumb-current">Explore Mountain Stays</span>
+          <span className="breadcrumb-current">Explore Valleys & Stays</span>
         </nav>
 
         {/* Heading */}
-        <h1 className="explore-hero-title">Mountain Stays & Sanctuaries</h1>
+        <h1 className="explore-hero-title">Rare Mountain Valleys & Sanctuaries</h1>
         <p className="explore-hero-subtitle">
-          Handcrafted wooden chalets, remote valley homestays, and slow retreats across Himachal Pradesh.
+          Handcrafted Kath-Kuni chalets, high-altitude desert homestays, and riverside camps across the Himalayas.
         </p>
 
         {/* Search Bar */}

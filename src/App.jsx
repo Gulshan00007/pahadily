@@ -10,6 +10,7 @@ import BookStayPage from "./pages/BookStayPage";
 import ExperiencesPage from "./pages/ExperiencesPage";
 import LocalsPage from "./pages/LocalsPage";
 import AdminPage from "./pages/AdminPage";
+import HostPortalPage from "./pages/HostPortalPage";
 import AuthModal from "./components/auth/AuthModal";
 import BookingModal from "./components/booking/BookingModal";
 import MyBookingsModal from "./components/booking/MyBookingsModal";
@@ -41,6 +42,9 @@ function App() {
           <Route path="/explore" element={<ExplorePage />} />
           <Route path="/experiences" element={<ExperiencesPage />} />
           <Route path="/locals" element={<LocalsPage />} />
+          <Route path="/host" element={<HostPortalPage />} />
+          <Route path="/host-portal" element={<HostPortalPage />} />
+          <Route path="/become-a-host" element={<HostPortalPage />} />
           <Route path="/admin" element={<AdminPage />} />
         </Routes>
         {/* Global Modals & Notifications */}

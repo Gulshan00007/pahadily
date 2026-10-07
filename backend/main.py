@@ -14,6 +14,13 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import Boolean, Date, DateTime, Float, Integer, String, Text, create_engine, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
+from email_service import (
+    send_booking_confirmation_email,
+    send_welcome_email,
+    print_banner_box,
+    _safe_print,
+)
+
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR / 'pahadily.db'}")
 SECRET_KEY = os.getenv("JWT_SECRET", "pahadily_secret_mountain_key_2026_super_secure")
@@ -73,6 +80,19 @@ class Place(Base):
     host_name: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    nearby_locations_json: Mapped[str] = mapped_column(Text, default="[]")
+    stay_options_json: Mapped[str] = mapped_column(Text, default="[]")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class PlaceReview(Base):
+    __tablename__ = "place_reviews"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    place_id: Mapped[int] = mapped_column(Integer, index=True)
+    user_name: Mapped[str] = mapped_column(String(120), default="Himalayan Traveler")
+    rating: Mapped[float] = mapped_column(Float, default=5.0)
+    comment: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
@@ -158,10 +178,64 @@ class HostApplication(Base):
     email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     region: Mapped[str] = mapped_column(String(120))
-    skill: Mapped[str] = mapped_column(String(120))
+    skill: Mapped[str] = mapped_column(String(120), default="Host")
     bio: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    languages: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
+    avatar: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    user_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+    # Location & Stay details
+    property_name: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
+    tagline: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    category: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    price: Mapped[Optional[str]] = mapped_column(String(50), default="₹2,500")
+    unit: Mapped[Optional[str]] = mapped_column(String(30), default="/night")
+    altitude: Mapped[Optional[str]] = mapped_column(String(50), default="1,800m")
+    tags: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    image: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    nearby_locations_json: Mapped[str] = mapped_column(Text, default="[]")
+    stay_options_json: Mapped[str] = mapped_column(Text, default="[]")
+
     status: Mapped[str] = mapped_column(String(30), default="pending")  # pending, approved, rejected
+    admin_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    published_place_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class EmailNotification(Base):
+    __tablename__ = "email_notifications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    recipient_email: Mapped[str] = mapped_column(String(255), index=True)
+    recipient_name: Mapped[str] = mapped_column(String(120), default="")
+    subject: Mapped[str] = mapped_column(String(255))
+    email_type: Mapped[str] = mapped_column(String(50), default="booking_confirmation")  # "booking_confirmation", "welcome_user"
+    booking_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+    status: Mapped[str] = mapped_column(String(30), default="sent")  # "sent", "delivered", "simulated", "failed"
+    preview: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class RegistrationOtp(Base):
+    __tablename__ = "registration_otps"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    email: Mapped[str] = mapped_column(String(255), index=True)
+    otp_code: Mapped[str] = mapped_column(String(10))
+    full_name: Mapped[str] = mapped_column(String(120))
+    phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    role: Mapped[str] = mapped_column(String(30), default="traveler")
+    password_hash: Mapped[str] = mapped_column(String(255))
+    salt: Mapped[str] = mapped_column(String(64))
+    is_used: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+# Create all tables if not yet created
+Base.metadata.create_all(bind=engine)
 
 
 # --- Password & Token Security ---
@@ -220,6 +294,19 @@ class UserSignup(BaseModel):
     role: str = "traveler"
 
 
+class SendRegistrationOtpRequest(BaseModel):
+    email: str
+    password: str = Field(min_length=6)
+    full_name: str = Field(min_length=2)
+    phone: Optional[str] = None
+    role: str = "traveler"
+
+
+class VerifyRegistrationOtpRequest(BaseModel):
+    email: str
+    otp_code: str
+
+
 class UserLogin(BaseModel):
     email: str
     password: str
@@ -271,6 +358,8 @@ class PlaceCreate(BaseModel):
     host_name: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    nearby_locations: Optional[list[dict]] = None
+    stay_options: Optional[list[dict]] = None
 
 
 class PlaceOut(BaseModel):
@@ -291,6 +380,29 @@ class PlaceOut(BaseModel):
     host_name: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    nearby_locations: list[dict] = []
+    stay_options: list[dict] = []
+
+
+class PlaceDynamicDetailsUpdate(BaseModel):
+    nearby_locations: Optional[list[dict]] = None
+    stay_options: Optional[list[dict]] = None
+
+
+class PlaceReviewCreate(BaseModel):
+    rating: float = Field(ge=1.0, le=5.0, default=5.0)
+    comment: str = ""
+    user_name: Optional[str] = "Himalayan Traveler"
+
+
+class PlaceReviewOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    place_id: int
+    user_name: str
+    rating: float
+    comment: str
+    created_at: datetime
 
 
 class ExperienceCreate(BaseModel):
@@ -433,8 +545,98 @@ class HostApplicationCreate(BaseModel):
     email: Optional[str] = None
     phone: Optional[str] = None
     region: str
-    skill: str
+    skill: Optional[str] = "Host"
     bio: Optional[str] = None
+    languages: Optional[str] = None
+    avatar: Optional[str] = None
+    user_id: Optional[int] = None
+
+    # Location & Stay details
+    property_name: Optional[str] = None
+    tagline: Optional[str] = None
+    category: Optional[str] = None
+    price: Optional[str] = "₹2,500"
+    unit: Optional[str] = "/night"
+    altitude: Optional[str] = "1,800m"
+    tags: Optional[str] = None
+    image: Optional[str] = None
+    description: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    nearby_locations: Optional[list[dict]] = None
+    stay_options: Optional[list[dict]] = None
+
+
+class EmailNotificationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    recipient_email: str
+    recipient_name: str
+    subject: str
+    email_type: str
+    booking_id: Optional[int] = None
+    status: str
+    preview: str
+    created_at: datetime
+
+
+# --- High-Visibility Backend Console Event Loggers ---
+
+def log_new_user_event(user: User):
+    print_banner_box(
+        "NEW USER REGISTERED (BACKEND EVENT)",
+        [
+            f"User ID:        #{user.id}",
+            f"Full Name:      {user.full_name}",
+            f"Email Address:  {user.email}",
+            f"Phone Number:   {user.phone or 'Not provided'}",
+            f"Role:           {user.role} (Himalayan Community)",
+            f"Account Status: {'Active' if user.is_active else 'Inactive'} (Verified: {user.is_verified})",
+            f"Registered At:  {user.created_at.strftime('%Y-%m-%d %H:%M:%S UTC')}",
+        ],
+        icon="👤 [NEW USER REGISTERED]"
+    )
+
+
+def log_payment_event(booking: Booking):
+    print_banner_box(
+        "PAYMENT RECEIVED & VERIFIED (BACKEND EVENT)",
+        [
+            f"Payment ID:     {booking.payment_id or 'N/A'}",
+            f"Amount Paid:    {booking.total_price or '₹0'}",
+            f"Payment Method: {(booking.payment_method or 'upi').upper()}",
+            f"Payment Status: {(booking.payment_status or 'paid').upper()}",
+            f"Txn Reference:  {booking.transaction_ref or 'N/A'}",
+            f"Payer:          {booking.traveler_name} <{booking.traveler_email}>",
+            f"Booking Link:   Booking #{booking.id} - {booking.item_title}",
+            f"Timestamp:      {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}",
+        ],
+        icon="💳 [PAYMENT PROCESSED]"
+    )
+
+
+def log_booking_event(booking: Booking):
+    dates_str = (
+        f"{booking.travel_date} to {booking.end_date} ({booking.nights} nights)"
+        if booking.end_date
+        else str(booking.travel_date)
+    )
+    print_banner_box(
+        "BOOKING CONFIRMED & RESERVED (BACKEND EVENT)",
+        [
+            f"Booking Ref:    #{booking.id}",
+            f"Category:       {booking.booking_type.upper()}",
+            f"Sanctuary:      {booking.item_title}",
+            f"Traveler:       {booking.traveler_name} ({booking.guests})",
+            f"Email:          {booking.traveler_email}",
+            f"Phone:          {booking.traveler_phone or 'N/A'}",
+            f"Travel Dates:   {dates_str}",
+            f"Total Fare:     {booking.total_price or '₹0'}",
+            f"Status:         {booking.status.upper()}",
+            f"Host Notice:    Reservation locked in database",
+        ],
+        icon="🏔️ [BOOKING CONFIRMED]"
+    )
 
 
 # --- Helper Functions ---
@@ -490,6 +692,8 @@ def place_to_dict(place: Place) -> dict:
         "host_name": place.host_name,
         "latitude": place.latitude,
         "longitude": place.longitude,
+        "nearby_locations": json.loads(place.nearby_locations_json or "[]"),
+        "stay_options": json.loads(place.stay_options_json or "[]"),
     }
 
 
@@ -539,6 +743,38 @@ def local_to_dict(local: Local) -> dict:
     }
 
 
+def host_application_to_dict(app: HostApplication) -> dict:
+    return {
+        "id": app.id,
+        "name": app.name,
+        "email": app.email,
+        "phone": app.phone,
+        "region": app.region,
+        "skill": app.skill,
+        "bio": app.bio,
+        "languages": app.languages,
+        "avatar": app.avatar,
+        "user_id": app.user_id,
+        "property_name": app.property_name,
+        "tagline": app.tagline,
+        "category": app.category,
+        "price": app.price,
+        "unit": app.unit,
+        "altitude": app.altitude,
+        "tags": app.tags,
+        "image": app.image,
+        "description": app.description,
+        "latitude": app.latitude,
+        "longitude": app.longitude,
+        "nearby_locations": json.loads(app.nearby_locations_json or "[]"),
+        "stay_options": json.loads(app.stay_options_json or "[]"),
+        "status": app.status,
+        "admin_notes": app.admin_notes,
+        "published_place_id": app.published_place_id,
+        "created_at": app.created_at.isoformat() if app.created_at else None,
+    }
+
+
 # --- App Initialization ---
 
 app = FastAPI(
@@ -581,28 +817,7 @@ def seed_database(db: Session):
         admin_user.is_verified = True
         db.commit()
 
-    # Seed default demonstration travelers & hosts if empty
-    if db.scalar(select(User.id).where(User.role != "admin").limit(1)) is None:
-        demo_users = [
-            ("host@pahadily.com", "pahadily123", "Karan Negi (Host)", "host", "+91 98160 00002", "Native Mountain Host in Tirthan"),
-            ("traveler@pahadily.com", "pahadily123", "Aarav Sharma", "traveler", "+91 98160 00003", "Conscious Himalayan Traveler"),
-        ]
-        for email, pwd, name, role, phone, bio in demo_users:
-            h, s = hash_password(pwd)
-            db.add(User(
-                email=email,
-                password_hash=h,
-                salt=s,
-                full_name=name,
-                role=role,
-                phone=phone,
-                bio=bio,
-                is_active=True,
-                is_verified=True,
-            ))
-        db.commit()
-
-    # Seed data from JSON
+    # Seed catalog data (genuine Himalayan valleys, stays, experiences and locals)
     seed_path = BASE_DIR / "seed_data.json"
     if seed_path.exists():
         try:
@@ -681,41 +896,6 @@ def seed_database(db: Session):
                     ))
                 db.commit()
 
-            # Seed sample initial bookings
-            if db.scalar(select(Booking.id).limit(1)) is None:
-                db.add(Booking(
-                    booking_type="local",
-                    item_id=1,
-                    item_title="Rahul Thakur (Local Companion)",
-                    item_image="/images/locals/rahul.jpg",
-                    user_id=3,
-                    traveler_name="Aarav Sharma",
-                    traveler_email="traveler@pahadily.com",
-                    traveler_phone="+91 98160 00003",
-                    travel_date=date(2026, 10, 15),
-                    guests="2",
-                    total_price="₹1,200",
-                    message="Looking forward to exploring secret cedar waterfall trails in Jibhi!",
-                    status="confirmed"
-                ))
-                db.add(Booking(
-                    booking_type="place",
-                    item_id=1,
-                    item_title="Tirthan Valley River Sanctuary",
-                    item_image="/images/destinations/tirthan-valley.jpg",
-                    user_id=3,
-                    traveler_name="Aarav Sharma",
-                    traveler_email="traveler@pahadily.com",
-                    traveler_phone="+91 98160 00003",
-                    travel_date=date(2026, 10, 20),
-                    end_date=date(2026, 10, 23),
-                    guests="2",
-                    total_price="₹7,200",
-                    message="Riverside room preferred for quiet reading and trout stream walks.",
-                    status="pending"
-                ))
-                db.commit()
-
         except Exception as e:
             print("Seed warning:", e)
 
@@ -733,6 +913,27 @@ def startup():
             ("bookings", "payment_id", "VARCHAR(100)", "NULL"),
             ("bookings", "transaction_ref", "VARCHAR(100)", "NULL"),
             ("bookings", "nights", "INTEGER", "1"),
+            ("places", "nearby_locations_json", "TEXT", "'[]'"),
+            ("places", "stay_options_json", "TEXT", "'[]'"),
+            ("host_applications", "skill", "VARCHAR(120)", "'Host'"),
+            ("host_applications", "languages", "VARCHAR(150)", "NULL"),
+            ("host_applications", "avatar", "VARCHAR(300)", "NULL"),
+            ("host_applications", "user_id", "INTEGER", "NULL"),
+            ("host_applications", "property_name", "VARCHAR(150)", "NULL"),
+            ("host_applications", "tagline", "VARCHAR(255)", "NULL"),
+            ("host_applications", "category", "VARCHAR(50)", "NULL"),
+            ("host_applications", "price", "VARCHAR(50)", "'₹2,500'"),
+            ("host_applications", "unit", "VARCHAR(30)", "'/night'"),
+            ("host_applications", "altitude", "VARCHAR(50)", "'1,800m'"),
+            ("host_applications", "tags", "VARCHAR(255)", "NULL"),
+            ("host_applications", "image", "VARCHAR(300)", "NULL"),
+            ("host_applications", "description", "TEXT", "NULL"),
+            ("host_applications", "latitude", "FLOAT", "NULL"),
+            ("host_applications", "longitude", "FLOAT", "NULL"),
+            ("host_applications", "nearby_locations_json", "TEXT", "'[]'"),
+            ("host_applications", "stay_options_json", "TEXT", "'[]'"),
+            ("host_applications", "admin_notes", "TEXT", "NULL"),
+            ("host_applications", "published_place_id", "INTEGER", "NULL"),
         ]:
             try:
                 conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN {col} {col_type} DEFAULT {default_val}"))
@@ -821,6 +1022,29 @@ def signup(payload: UserSignup, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
 
+    # 1. High-visibility console log for backend
+    log_new_user_event(user)
+
+    # 2. Dispatch welcome email to user & record notification
+    try:
+        welcome_res = send_welcome_email({
+            "full_name": user.full_name,
+            "email": user.email,
+            "role": user.role,
+        })
+        email_record = EmailNotification(
+            recipient_email=user.email,
+            recipient_name=user.full_name,
+            subject=f"Welcome to Pahadíly, {user.full_name}!",
+            email_type="welcome_user",
+            status=welcome_res.get("status", "sent"),
+            preview=f"Welcome email dispatched for newly registered {user.role} #{user.id}",
+        )
+        db.add(email_record)
+        db.commit()
+    except Exception as e:
+        _safe_print(f"[WELCOME EMAIL NOTICE] Could not record notification: {e}")
+
     token = create_token(user)
     return AuthResponse(
         token=token,
@@ -829,12 +1053,147 @@ def signup(payload: UserSignup, db: Session = Depends(get_db)):
     )
 
 
+@app.post("/api/auth/send-registration-otp", tags=["auth"])
+def send_registration_otp(payload: SendRegistrationOtpRequest, db: Session = Depends(get_db)):
+    existing = db.scalar(select(User).where(User.email == payload.email.lower()))
+    if existing:
+        raise HTTPException(status_code=400, detail="An account with this email already exists. Please log in.")
+
+    # Generate 6-digit cryptographically secure OTP
+    otp_code = str(secrets.randbelow(900000) + 100000)
+    h, s = hash_password(payload.password)
+
+    # Invalidate older unused OTPs for this email
+    older_otps = list(db.scalars(select(RegistrationOtp).where(
+        RegistrationOtp.email == payload.email.lower(),
+        RegistrationOtp.is_used == False,
+    )).all())
+    for o in older_otps:
+        o.is_used = True
+
+    otp_record = RegistrationOtp(
+        email=payload.email.lower(),
+        otp_code=otp_code,
+        full_name=payload.full_name,
+        phone=payload.phone,
+        role=payload.role if payload.role in ["traveler", "host", "admin"] else "traveler",
+        password_hash=h,
+        salt=s,
+        is_used=False,
+    )
+    db.add(otp_record)
+    db.commit()
+
+    # Print high-visibility banner in console
+    print_banner_box(
+        "REGISTRATION OTP DISPATCHED (VERIFICATION CODE)",
+        [
+            f"Recipient:  {payload.email.lower()}",
+            f"Name:       {payload.full_name}",
+            f"Role:       {payload.role.upper()}",
+            f"OTP CODE:   {otp_code}",
+            f"Valid For:  15 Minutes",
+            f"Notice:     Use this 6-digit OTP code to complete registration",
+        ],
+        icon="🔐 [OTP AUTHENTICATION]"
+    )
+
+    return {
+        "message": f"Verification code sent to {payload.email.lower()}!",
+        "email": payload.email.lower(),
+        "otp_preview": otp_code,
+    }
+
+
+@app.post("/api/auth/verify-registration-otp", response_model=AuthResponse, tags=["auth"])
+def verify_registration_otp(payload: VerifyRegistrationOtpRequest, db: Session = Depends(get_db)):
+    stmt = (
+        select(RegistrationOtp)
+        .where(
+            RegistrationOtp.email == payload.email.lower(),
+            RegistrationOtp.is_used == False,
+        )
+        .order_by(RegistrationOtp.created_at.desc())
+    )
+    otp_record = db.scalar(stmt)
+    if not otp_record:
+        raise HTTPException(
+            status_code=400,
+            detail="No pending verification request found for this email. Please request a new code.",
+        )
+
+    if otp_record.otp_code.strip() != payload.otp_code.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid verification code. Please check and try again.",
+        )
+
+    # Check if user already exists
+    existing = db.scalar(select(User).where(User.email == payload.email.lower()))
+    if existing:
+        otp_record.is_used = True
+        db.commit()
+        token = create_token(existing)
+        return AuthResponse(
+            token=token,
+            user=UserOut.model_validate(existing),
+            message="Email verified! Logged in successfully.",
+        )
+
+    # Mark OTP as used
+    otp_record.is_used = True
+
+    user = User(
+        email=otp_record.email,
+        password_hash=otp_record.password_hash,
+        salt=otp_record.salt,
+        full_name=otp_record.full_name,
+        phone=otp_record.phone,
+        role=otp_record.role,
+        is_active=True,
+        is_verified=True,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    log_new_user_event(user)
+
+    try:
+        welcome_res = send_welcome_email({
+            "full_name": user.full_name,
+            "email": user.email,
+            "role": user.role,
+        })
+        email_record = EmailNotification(
+            recipient_email=user.email,
+            recipient_name=user.full_name,
+            subject=f"Welcome to Pahadíly, {user.full_name}!",
+            email_type="welcome_user",
+            status=welcome_res.get("status", "sent"),
+            preview=f"Welcome email dispatched for newly registered {user.role} #{user.id}",
+        )
+        db.add(email_record)
+        db.commit()
+    except Exception as e:
+        _safe_print(f"[WELCOME EMAIL NOTICE] Could not record notification: {e}")
+
+    token = create_token(user)
+    return AuthResponse(
+        token=token,
+        user=UserOut.model_validate(user),
+        message="Account verified and registered successfully! Welcome to Pahadíly.",
+    )
+
+
 @app.post("/api/auth/login", response_model=AuthResponse, tags=["auth"])
 def login(payload: UserLogin, db: Session = Depends(get_db)):
     user = db.scalar(select(User).where(User.email == payload.email.lower()))
     if not user or not verify_password(payload.password, user.salt, user.password_hash):
+        _safe_print(f"[AUTH FAILED] Failed login attempt for email: {payload.email.lower()}")
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
+    _safe_print(f"\n[USER LOGIN SUCCESS] {user.full_name} ({user.email}) logged in successfully. Role: {user.role}")
     token = create_token(user)
     return AuthResponse(
         token=token,
@@ -845,25 +1204,9 @@ def login(payload: UserLogin, db: Session = Depends(get_db)):
 
 @app.post("/api/auth/demo-login", response_model=AuthResponse, tags=["auth"])
 def demo_login(role: str = Query(default="traveler"), db: Session = Depends(get_db)):
-    if role == "admin":
-        raise HTTPException(
-            status_code=403,
-            detail="Admin access is protected. Please log in with administrator email and password."
-        )
-
-    target_email = "traveler@pahadily.com"
-    if role == "host":
-        target_email = "host@pahadily.com"
-
-    user = db.scalar(select(User).where(User.email == target_email))
-    if not user:
-        raise HTTPException(status_code=404, detail=f"Demo {role} account not found")
-
-    token = create_token(user)
-    return AuthResponse(
-        token=token,
-        user=UserOut.model_validate(user),
-        message=f"Logged in as demo {role}"
+    raise HTTPException(
+        status_code=400,
+        detail="Demo logins have been replaced with real user authentication. Please register a real account or log in with your credentials."
     )
 
 
@@ -907,6 +1250,49 @@ def get_place(place_id: int, db: Session = Depends(get_db)):
     if not place:
         raise HTTPException(status_code=404, detail="Place not found")
     return place_to_dict(place)
+
+
+@app.post("/api/places/{place_id}/rate", response_model=PlaceOut, tags=["places"])
+@app.post("/api/places/{place_id}/reviews", response_model=PlaceOut, tags=["places"])
+def rate_place(
+    place_id: int,
+    payload: PlaceReviewCreate,
+    db: Session = Depends(get_db),
+):
+    place = db.get(Place, place_id)
+    if not place:
+        raise HTTPException(status_code=404, detail="Place not found")
+
+    review = PlaceReview(
+        place_id=place_id,
+        user_name=payload.user_name or "Himalayan Traveler",
+        rating=float(payload.rating),
+        comment=payload.comment or "",
+    )
+    db.add(review)
+    db.commit()
+
+    # Recalculate live dynamic rating & review count
+    reviews = list(db.scalars(select(PlaceReview).where(PlaceReview.place_id == place_id)).all())
+    if reviews:
+        total_rating = sum(r.rating for r in reviews)
+        place.rating = round(total_rating / len(reviews), 1)
+        place.reviews = len(reviews)
+    db.commit()
+    db.refresh(place)
+    return place_to_dict(place)
+
+
+@app.get("/api/places/{place_id}/reviews", response_model=list[PlaceReviewOut], tags=["places"])
+def list_place_reviews(place_id: int, db: Session = Depends(get_db)):
+    reviews = list(
+        db.scalars(
+            select(PlaceReview)
+            .where(PlaceReview.place_id == place_id)
+            .order_by(PlaceReview.created_at.desc())
+        ).all()
+    )
+    return reviews
 
 
 @app.post("/api/places", response_model=PlaceOut, status_code=201, tags=["places"])
@@ -986,7 +1372,28 @@ def delete_place(
     return {"message": "Place deleted successfully"}
 
 
-# --- Experiences Endpoints (Dynamic) ---
+@app.patch("/api/places/{place_id}/dynamic-details", response_model=PlaceOut, tags=["places"])
+def update_place_dynamic_details(
+    place_id: int,
+    payload: PlaceDynamicDetailsUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Update nearby locations and stay options for a place (editable from admin)."""
+    place = db.get(Place, place_id)
+    if not place:
+        raise HTTPException(status_code=404, detail="Place not found")
+
+    if payload.nearby_locations is not None:
+        place.nearby_locations_json = json.dumps(payload.nearby_locations, ensure_ascii=False)
+    if payload.stay_options is not None:
+        place.stay_options_json = json.dumps(payload.stay_options, ensure_ascii=False)
+
+    db.commit()
+    db.refresh(place)
+    return place_to_dict(place)
+
+
 
 @app.get("/api/experiences", response_model=list[ExperienceOut], tags=["experiences"])
 def list_experiences(
@@ -1397,6 +1804,45 @@ def create_booking(
     db.add(booking)
     db.commit()
     db.refresh(booking)
+
+    # 1. High-visibility backend payment logging
+    log_payment_event(booking)
+
+    # 2. High-visibility backend booking confirmation logging
+    log_booking_event(booking)
+
+    # 3. Automated booking confirmation voucher email dispatch
+    try:
+        email_res = send_booking_confirmation_email({
+            "id": booking.id,
+            "item_title": booking.item_title,
+            "traveler_name": booking.traveler_name,
+            "traveler_email": booking.traveler_email,
+            "traveler_phone": booking.traveler_phone,
+            "travel_date": booking.travel_date,
+            "end_date": booking.end_date,
+            "nights": booking.nights,
+            "guests": booking.guests,
+            "total_price": booking.total_price,
+            "payment_method": booking.payment_method,
+            "payment_status": booking.payment_status,
+            "payment_id": booking.payment_id,
+            "transaction_ref": booking.transaction_ref,
+        })
+        email_record = EmailNotification(
+            recipient_email=booking.traveler_email,
+            recipient_name=booking.traveler_name,
+            subject=f"Booking Confirmed: {booking.item_title} | Pahadíly Voucher #{booking.id}",
+            email_type="booking_confirmation",
+            booking_id=booking.id,
+            status=email_res.get("status", "sent"),
+            preview=f"Voucher #{booking.id} for {booking.item_title} ({booking.total_price} via {booking.payment_method})",
+        )
+        db.add(email_record)
+        db.commit()
+    except Exception as e:
+        _safe_print(f"[BOOKING EMAIL NOTICE] Could not dispatch email voucher: {e}")
+
     return booking
 
 
@@ -1476,6 +1922,7 @@ def update_booking_payment(
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
 
+    was_pending = (booking.payment_status != "paid")
     booking.payment_status = payload.payment_status
     if payload.payment_method:
         booking.payment_method = payload.payment_method
@@ -1489,6 +1936,42 @@ def update_booking_payment(
 
     db.commit()
     db.refresh(booking)
+
+    # If status transitioned to paid, log backend payment event & dispatch confirmation voucher
+    if payload.payment_status == "paid" and was_pending:
+        log_payment_event(booking)
+        log_booking_event(booking)
+        try:
+            email_res = send_booking_confirmation_email({
+                "id": booking.id,
+                "item_title": booking.item_title,
+                "traveler_name": booking.traveler_name,
+                "traveler_email": booking.traveler_email,
+                "traveler_phone": booking.traveler_phone,
+                "travel_date": booking.travel_date,
+                "end_date": booking.end_date,
+                "nights": booking.nights,
+                "guests": booking.guests,
+                "total_price": booking.total_price,
+                "payment_method": booking.payment_method,
+                "payment_status": booking.payment_status,
+                "payment_id": booking.payment_id,
+                "transaction_ref": booking.transaction_ref,
+            })
+            email_record = EmailNotification(
+                recipient_email=booking.traveler_email,
+                recipient_name=booking.traveler_name,
+                subject=f"Booking Confirmed: {booking.item_title} | Pahadíly Voucher #{booking.id}",
+                email_type="booking_confirmation",
+                booking_id=booking.id,
+                status=email_res.get("status", "sent"),
+                preview=f"Payment settlement confirmed for Voucher #{booking.id}",
+            )
+            db.add(email_record)
+            db.commit()
+        except Exception as e:
+            _safe_print(f"[BOOKING EMAIL NOTICE] Could not dispatch voucher: {e}")
+
     return booking
 
 
@@ -1512,40 +1995,204 @@ def delete_booking(
 # --- Host Applications ---
 
 @app.post("/api/host-applications", status_code=201, tags=["hosts"])
-def create_host_application(payload: HostApplicationCreate, db: Session = Depends(get_db)):
-    application = HostApplication(**payload.model_dump())
+def create_host_application(
+    payload: HostApplicationCreate,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
+    data = payload.model_dump()
+    nearby = data.pop("nearby_locations", None) or []
+    stay_opts = data.pop("stay_options", None) or []
+
+    application = HostApplication(**data)
+    if current_user and not application.user_id:
+        application.user_id = current_user.id
+        if not application.email and current_user.email:
+            application.email = current_user.email
+
+    application.nearby_locations_json = json.dumps(nearby, ensure_ascii=False)
+    application.stay_options_json = json.dumps(stay_opts, ensure_ascii=False)
+    application.status = "pending"
+
     db.add(application)
     db.commit()
     db.refresh(application)
-    return {"id": application.id, "status": application.status, "message": "Host application received! Our team will review your application."}
+    return {
+        "id": application.id,
+        "status": application.status,
+        "message": "Host & Location details submitted successfully! Your listing is now pending administrator review.",
+        "application": host_application_to_dict(application),
+    }
 
 
 @app.get("/api/host-applications", tags=["hosts"])
-def list_host_applications(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def list_host_applications(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     stmt = select(HostApplication).order_by(HostApplication.created_at.desc())
-    return list(db.scalars(stmt).all())
+    if current_user.role != "admin":
+        stmt = stmt.where(
+            (HostApplication.user_id == current_user.id) |
+            (HostApplication.email == current_user.email.lower())
+        )
+    apps = list(db.scalars(stmt).all())
+    return [host_application_to_dict(a) for a in apps]
+
+
+@app.get("/api/host-applications/my-submissions", tags=["hosts"])
+def get_my_host_submissions(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    stmt = select(HostApplication).where(
+        (HostApplication.user_id == current_user.id) |
+        (HostApplication.email == current_user.email.lower())
+    ).order_by(HostApplication.created_at.desc())
+    apps = list(db.scalars(stmt).all())
+    return [host_application_to_dict(a) for a in apps]
 
 
 @app.patch("/api/host-applications/{app_id}/status", tags=["hosts"])
 def update_host_application_status(
     app_id: int,
     status_val: str = Query(..., pattern="^(pending|approved|rejected)$"),
+    admin_notes: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Administrator privileges required to review host applications.")
+
     app_obj = db.get(HostApplication, app_id)
     if not app_obj:
         raise HTTPException(status_code=404, detail="Application not found")
 
     app_obj.status = status_val
+    if admin_notes is not None:
+        app_obj.admin_notes = admin_notes
 
-    # When approved, upgrade user account if matching email exists
-    if status_val == "approved" and app_obj.email:
-        matching_user = db.scalar(select(User).where(User.email == app_obj.email.lower()))
+    published_id = app_obj.published_place_id
+
+    # When approved:
+    if status_val == "approved":
+        # 1. Upgrade user role if matching account exists
+        matching_user = None
+        if app_obj.user_id:
+            matching_user = db.get(User, app_obj.user_id)
+        if not matching_user and app_obj.email:
+            matching_user = db.scalar(select(User).where(User.email == app_obj.email.lower()))
+
         if matching_user:
             matching_user.role = "host"
             matching_user.is_verified = True
 
+        # 2. If property_name was provided and not published yet, publish it as a live Place!
+        if app_obj.property_name and not app_obj.published_place_id:
+            tags_list = [t.strip() for t in (app_obj.tags or "Mountain Sanctuary, Handcrafted, Local Meals").split(",") if t.strip()]
+            new_place = Place(
+                name=app_obj.property_name,
+                tagline=app_obj.tagline or f"Authentic sanctuary hosted by {app_obj.name}",
+                region=(app_obj.region or "himachal").lower().replace(" ", "-"),
+                category=app_obj.category or "Homestay",
+                price=app_obj.price or "₹2,500",
+                unit=app_obj.unit or "/night",
+                rating=5.0,
+                reviews=1,
+                altitude=app_obj.altitude or "1,800m",
+                tags_json=json.dumps(tags_list, ensure_ascii=False),
+                image=app_obj.image or "/images/destinations/tirthan-valley.jpg",
+                description=app_obj.description or f"Welcome to {app_obj.property_name}. Experience the Himalayas with local host {app_obj.name}.",
+                host_name=app_obj.name,
+                latitude=app_obj.latitude,
+                longitude=app_obj.longitude,
+                nearby_locations_json=app_obj.nearby_locations_json or "[]",
+                stay_options_json=app_obj.stay_options_json or "[]",
+            )
+            db.add(new_place)
+            db.flush()
+            app_obj.published_place_id = new_place.id
+            published_id = new_place.id
+
     db.commit()
     db.refresh(app_obj)
-    return {"id": app_obj.id, "status": app_obj.status, "message": f"Host application marked as {status_val}"}
+    return {
+        "id": app_obj.id,
+        "status": app_obj.status,
+        "published_place_id": published_id,
+        "message": f"Host application marked as {status_val}" + (f" and published as Place #{published_id}!" if published_id and status_val == "approved" else "."),
+        "application": host_application_to_dict(app_obj),
+    }
+
+
+@app.delete("/api/host-applications/{app_id}", tags=["hosts"])
+def delete_host_application(
+    app_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    app_obj = db.get(HostApplication, app_id)
+    if not app_obj:
+        raise HTTPException(status_code=404, detail="Application not found")
+    db.delete(app_obj)
+    db.commit()
+    return {"message": "Host application deleted successfully"}
+
+
+# --- Email & Notification Audit Endpoints ---
+
+@app.post("/api/bookings/{booking_id}/resend-email", tags=["bookings"])
+def resend_booking_email(
+    booking_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    booking = db.get(Booking, booking_id)
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+
+    if current_user.role != "admin" and booking.traveler_email.lower() != current_user.email.lower():
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    email_res = send_booking_confirmation_email({
+        "id": booking.id,
+        "item_title": booking.item_title,
+        "traveler_name": booking.traveler_name,
+        "traveler_email": booking.traveler_email,
+        "traveler_phone": booking.traveler_phone,
+        "travel_date": booking.travel_date,
+        "end_date": booking.end_date,
+        "nights": booking.nights,
+        "guests": booking.guests,
+        "total_price": booking.total_price,
+        "payment_method": booking.payment_method,
+        "payment_status": booking.payment_status,
+        "payment_id": booking.payment_id,
+        "transaction_ref": booking.transaction_ref,
+    })
+    email_record = EmailNotification(
+        recipient_email=booking.traveler_email,
+        recipient_name=booking.traveler_name,
+        subject=f"Re-sent: Booking Confirmed: {booking.item_title} | Pahadíly Voucher #{booking.id}",
+        email_type="booking_confirmation",
+        booking_id=booking.id,
+        status=email_res.get("status", "sent"),
+        preview=f"Voucher #{booking.id} re-dispatched to {booking.traveler_email}",
+    )
+    db.add(email_record)
+    db.commit()
+    return {"message": f"Confirmation voucher sent to {booking.traveler_email}"}
+
+
+@app.get("/api/notifications", response_model=list[EmailNotificationOut], tags=["notifications"])
+def list_email_notifications(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    stmt = select(EmailNotification).order_by(EmailNotification.created_at.desc())
+    if current_user.role != "admin":
+        stmt = stmt.where(EmailNotification.recipient_email == current_user.email.lower())
+    return list(db.scalars(stmt).all())
+

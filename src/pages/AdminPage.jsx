@@ -64,6 +64,8 @@ function AdminPage() {
 
   // Host Applications state
   const [applications, setApplications] = useState([]);
+  const [selectedAppModal, setSelectedAppModal] = useState(null);
+  const [adminNotesInput, setAdminNotesInput] = useState("");
 
   // Places state
   const [places, setPlaces] = useState([]);
@@ -288,8 +290,14 @@ function AdminPage() {
   // --- Host Application Handlers ---
   const handleApproveHostApp = async (appId, applicantName) => {
     try {
-      await updateHostApplicationStatus(appId, "approved");
-      showToast(`Approved ${applicantName}! Account upgraded to Host.`);
+      const res = await updateHostApplicationStatus(appId, "approved", adminNotesInput || undefined);
+      if (res?.published_place_id) {
+        showToast(`Approved ${applicantName}! Sanctuary published live as Place #${res.published_place_id}`);
+      } else {
+        showToast(`Approved ${applicantName}! Account upgraded to Host.`);
+      }
+      setSelectedAppModal(null);
+      setAdminNotesInput("");
       loadData();
     } catch (err) {
       showToast(err.message || "Failed to approve application", "error");
@@ -298,8 +306,10 @@ function AdminPage() {
 
   const handleRejectHostApp = async (appId) => {
     try {
-      await updateHostApplicationStatus(appId, "rejected");
+      await updateHostApplicationStatus(appId, "rejected", adminNotesInput || undefined);
       showToast("Application marked as rejected.");
+      setSelectedAppModal(null);
+      setAdminNotesInput("");
       loadData();
     } catch (err) {
       showToast(err.message || "Failed to update application", "error");
@@ -1090,24 +1100,24 @@ function AdminPage() {
             <div className="admin-applications-tab">
               <div className="admin-tab-topbar">
                 <div>
-                  <h2>Host & Partner Applications</h2>
-                  <p>Review mountain natives applying to become hosts and companions on Pahadíly.</p>
+                  <h2>Host & Location Submissions ({applications.length})</h2>
+                  <p>Review mountain natives and their submitted sanctuaries. Approving automatically publishes the stay live to the catalog.</p>
                 </div>
               </div>
 
               {loading ? (
                 <div className="admin-loading">Loading applications...</div>
               ) : applications.length === 0 ? (
-                <div className="admin-empty">No pending host applications.</div>
+                <div className="admin-empty">No host or location submissions found.</div>
               ) : (
                 <div className="table-responsive">
                   <table className="admin-table full-width">
                     <thead>
                       <tr>
                         <th>ID</th>
-                        <th>Applicant</th>
-                        <th>Region & Skill</th>
-                        <th>Background Bio</th>
+                        <th>Host Profile</th>
+                        <th>Sanctuary & Location</th>
+                        <th>Price & Valley</th>
                         <th>Status</th>
                         <th>Submitted</th>
                         <th>Actions</th>
@@ -1121,13 +1131,37 @@ function AdminPage() {
                             <strong>{app.name}</strong>
                             {app.email && <div className="sub-contact">{app.email}</div>}
                             {app.phone && <div className="sub-contact">📞 {app.phone}</div>}
+                            {app.languages && <small className="sub-contact">🗣️ {app.languages}</small>}
                           </td>
                           <td>
-                            <strong>{app.region}</strong>
-                            <div className="sub-contact">{app.skill}</div>
+                            {app.property_name ? (
+                              <div className="app-property-preview-cell">
+                                {app.image && (
+                                  <img
+                                    src={app.image}
+                                    alt={app.property_name}
+                                    className="app-table-thumb"
+                                    onError={(e) => { e.target.style.display = 'none'; }}
+                                  />
+                                )}
+                                <div>
+                                  <strong className="app-prop-name">{app.property_name}</strong>
+                                  <div className="sub-contact">{app.category || "Homestay"} · {app.tagline || ""}</div>
+                                  {app.published_place_id && (
+                                    <span className="live-pill">✨ Published Live (#{app.published_place_id})</span>
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              <div>
+                                <span className="sub-contact">{app.skill || "Host"}</span>
+                                <div className="bio-preview">{app.bio || "No location details attached."}</div>
+                              </div>
+                            )}
                           </td>
                           <td>
-                            <div className="bio-preview">{app.bio || "No bio provided."}</div>
+                            <strong>{app.price || "—"}</strong>
+                            <div className="sub-contact">📍 {app.region} ({app.altitude || "—"})</div>
                           </td>
                           <td>
                             <span className={`status-pill ${app.status}`}>
@@ -1139,18 +1173,33 @@ function AdminPage() {
                           </td>
                           <td>
                             <div className="action-buttons-cell">
+                              <button
+                                type="button"
+                                className="action-btn-mini inspect-btn"
+                                onClick={() => {
+                                  setSelectedAppModal(app);
+                                  setAdminNotesInput(app.admin_notes || "");
+                                }}
+                                title="Inspect full host and location details"
+                              >
+                                🔍 Inspect
+                              </button>
                               {app.status !== "approved" && (
                                 <button
+                                  type="button"
                                   className="action-btn-mini pay"
                                   onClick={() => handleApproveHostApp(app.id, app.name)}
+                                  title="Approve host and publish stay live"
                                 >
-                                  ✓ Approve Host
+                                  ✓ Approve & Publish
                                 </button>
                               )}
                               {app.status !== "rejected" && (
                                 <button
+                                  type="button"
                                   className="action-btn-mini delete"
                                   onClick={() => handleRejectHostApp(app.id)}
+                                  title="Reject submission"
                                 >
                                   Reject
                                 </button>
@@ -1161,6 +1210,192 @@ function AdminPage() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+
+              {/* Host & Location Inspection Modal */}
+              {selectedAppModal && (
+                <div className="pahadily-modal-overlay" onClick={() => setSelectedAppModal(null)}>
+                  <div className="admin-inspection-modal" onClick={(e) => e.stopPropagation()}>
+                    <div className="modal-top-bar">
+                      <div>
+                        <span className="badge-inspect">SUBMISSION #{selectedAppModal.id}</span>
+                        <h2>{selectedAppModal.property_name || selectedAppModal.name}</h2>
+                      </div>
+                      <button
+                        type="button"
+                        className="modal-close-icon"
+                        onClick={() => setSelectedAppModal(null)}
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    <div className="modal-inspect-body">
+                      {/* Host Profile Info */}
+                      <div className="inspect-section-card">
+                        <h3>👤 Host Profile</h3>
+                        <div className="inspect-grid-2">
+                          <div>
+                            <strong>Full Name:</strong> <span>{selectedAppModal.name}</span>
+                          </div>
+                          <div>
+                            <strong>Contact Email:</strong> <span>{selectedAppModal.email || "—"}</span>
+                          </div>
+                          <div>
+                            <strong>Phone / WhatsApp:</strong> <span>{selectedAppModal.phone || "—"}</span>
+                          </div>
+                          <div>
+                            <strong>Native Region:</strong> <span>{selectedAppModal.region}</span>
+                          </div>
+                          <div>
+                            <strong>Languages:</strong> <span>{selectedAppModal.languages || "—"}</span>
+                          </div>
+                          <div>
+                            <strong>Assigned Skill:</strong> <span>{selectedAppModal.skill || "Native Host"}</span>
+                          </div>
+                        </div>
+                        {selectedAppModal.bio && (
+                          <div className="inspect-bio-box">
+                            <strong>Host Story & Bio:</strong>
+                            <p>{selectedAppModal.bio}</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Property & Location Info */}
+                      {selectedAppModal.property_name && (
+                        <div className="inspect-section-card">
+                          <h3>🏔️ Location & Sanctuary Details</h3>
+                          {selectedAppModal.image && (
+                            <div
+                              className="inspect-cover-banner"
+                              style={{ backgroundImage: `url('${selectedAppModal.image}')` }}
+                            >
+                              <span className="cover-badge">{selectedAppModal.category || "Homestay"}</span>
+                              <span className="price-badge">{selectedAppModal.price} {selectedAppModal.unit || "/night"}</span>
+                            </div>
+                          )}
+                          <div className="inspect-grid-2" style={{ marginTop: 14 }}>
+                            <div>
+                              <strong>Tagline:</strong> <span>{selectedAppModal.tagline || "—"}</span>
+                            </div>
+                            <div>
+                              <strong>Altitude:</strong> <span>{selectedAppModal.altitude || "—"}</span>
+                            </div>
+                            <div>
+                              <strong>Valley / Region:</strong> <span>{selectedAppModal.region}</span>
+                            </div>
+                            <div>
+                              <strong>Category:</strong> <span>{selectedAppModal.category}</span>
+                            </div>
+                          </div>
+
+                          {selectedAppModal.tags && (
+                            <div className="inspect-tags-row">
+                              <strong>Amenities:</strong>
+                              <div className="tags-chips">
+                                {selectedAppModal.tags.split(",").map((t, i) => (
+                                  <span key={i} className="chip">{t.trim()}</span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {selectedAppModal.description && (
+                            <div className="inspect-desc-box">
+                              <strong>Description:</strong>
+                              <p>{selectedAppModal.description}</p>
+                            </div>
+                          )}
+
+                          {/* Nearby locations */}
+                          {Array.isArray(selectedAppModal.nearby_locations) && selectedAppModal.nearby_locations.length > 0 && (
+                            <div className="inspect-sublist">
+                              <h4>📍 Nearby Spots ({selectedAppModal.nearby_locations.length}):</h4>
+                              <ul>
+                                {selectedAppModal.nearby_locations.map((item, idx) => (
+                                  <li key={idx}>
+                                    <strong>{item.name}</strong> — {item.distance}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {/* Room options */}
+                          {Array.isArray(selectedAppModal.stay_options) && selectedAppModal.stay_options.length > 0 && (
+                            <div className="inspect-sublist">
+                              <h4>🛏️ Room / Stay Options ({selectedAppModal.stay_options.length}):</h4>
+                              <ul>
+                                {selectedAppModal.stay_options.map((opt, idx) => (
+                                  <li key={idx}>
+                                    <strong>{opt.name}</strong>: {opt.price} ({opt.features || "Standard"})
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Status & Live Link */}
+                      <div className="inspect-section-card">
+                        <h3>⚡ Status & Publishing</h3>
+                        <div className="status-inspect-row">
+                          <span>Current Status:</span>
+                          <span className={`status-pill ${selectedAppModal.status}`}>
+                            {selectedAppModal.status.toUpperCase()}
+                          </span>
+                        </div>
+                        {selectedAppModal.published_place_id && (
+                          <div className="published-alert">
+                            ✨ This location is published live in the catalog as <strong>Place #{selectedAppModal.published_place_id}</strong>!
+                          </div>
+                        )}
+
+                        <div className="admin-notes-form-group">
+                          <label>Administrator Review Notes / Feedback:</label>
+                          <textarea
+                            rows={2}
+                            placeholder="Add notes for the host (e.g. Verified water quality and road connectivity)..."
+                            value={adminNotesInput}
+                            onChange={(e) => setAdminNotesInput(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="modal-inspect-footer">
+                      <button
+                        type="button"
+                        className="btn-modal-cancel"
+                        onClick={() => setSelectedAppModal(null)}
+                      >
+                        Cancel
+                      </button>
+
+                      {selectedAppModal.status !== "rejected" && (
+                        <button
+                          type="button"
+                          className="btn-modal-reject"
+                          onClick={() => handleRejectHostApp(selectedAppModal.id)}
+                        >
+                          ✕ Reject Submission
+                        </button>
+                      )}
+
+                      {selectedAppModal.status !== "approved" && (
+                        <button
+                          type="button"
+                          className="btn-modal-approve-publish"
+                          onClick={() => handleApproveHostApp(selectedAppModal.id, selectedAppModal.name)}
+                        >
+                          ✓ Approve & Publish Live to Stays Catalog
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

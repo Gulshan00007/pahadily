@@ -241,9 +241,9 @@ function Footer() {
               <ul className="footer-nav-list">
                 <li><a href="/locals" className="footer-link">Native Companions & Guides</a></li>
                 <li><a href="/locals" className="footer-link">Artisans & Storytellers</a></li>
-                <li><a href="/admin" className="footer-link">Host & Admin Portal</a></li>
+                <li><a href="/admin" className="footer-link">Operations Control</a></li>
                 <li><a href="/explore" className="footer-link">Responsible Travel Code</a></li>
-                <li><a href="/locals" className="footer-link">Join as Village Host</a></li>
+                <li><a href="/host" className="footer-link">Join as Village Host</a></li>
               </ul>
             </div>
 

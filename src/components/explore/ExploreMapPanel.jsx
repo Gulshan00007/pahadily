@@ -1,12 +1,14 @@
 import { useState } from "react";
 
 const MAP_PINS = [
-  { id: "pangi", name: "Pangi Valley", x: 62, y: 10, type: "trek" },
-  { id: "spiti", name: "Spiti Valley", x: 82, y: 18, type: "place" },
-  { id: "kasol", name: "Kasol", x: 30, y: 44, type: "homestay" },
-  { id: "jibhi", name: "Jibhi", x: 52, y: 50, type: "place" },
-  { id: "parvati", name: "Parvati Valley", x: 78, y: 55, type: "local" },
-  { id: "tirthan", name: "Tirthan Valley", x: 42, y: 68, type: "trek" },
+  { id: "pangi", name: "Pangi Valley", x: 28, y: 15, type: "trek" },
+  { id: "zanskar", name: "Zanskar Frontier", x: 50, y: 8, type: "trek" },
+  { id: "spiti", name: "Spiti Valley", x: 78, y: 22, type: "place" },
+  { id: "kinnaur", name: "Kinnaur & Sangla", x: 82, y: 48, type: "homestay" },
+  { id: "parvati", name: "Parvati Valley", x: 62, y: 42, type: "local" },
+  { id: "jibhi", name: "Jibhi Valley", x: 52, y: 56, type: "place" },
+  { id: "tirthan", name: "Tirthan Valley", x: 42, y: 66, type: "trek" },
+  { id: "chopta", name: "Chopta Bugyals", x: 86, y: 72, type: "homestay" },
 ];
 
 const PIN_COLORS = {
@@ -32,11 +34,17 @@ function MapPin({ pin, active, onClick }) {
   );
 }
 
-function ExploreMapPanel() {
-  const [activePin, setActivePin] = useState(null);
+function ExploreMapPanel({ activeValley, onSelectValley }) {
+  const [activePin, setActivePin] = useState(activeValley || null);
   const [mapView, setMapView] = useState("map");
 
-  const handlePin = (id) => setActivePin(activePin === id ? null : id);
+  const handlePin = (id) => {
+    const nextPin = activePin === id ? null : id;
+    setActivePin(nextPin);
+    if (onSelectValley) {
+      onSelectValley(nextPin || "all");
+    }
+  };
 
   return (
     <div className="ep-map-panel">

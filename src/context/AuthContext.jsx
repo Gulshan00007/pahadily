@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { getMe, loginUser, signupUser, demoLoginUser } from "../lib/api";
+import { getMe, loginUser, signupUser, demoLoginUser, sendRegistrationOtp, verifyRegistrationOtp } from "../lib/api";
 
 const AuthContext = createContext(null);
 
@@ -77,6 +77,22 @@ export function AuthProvider({ children }) {
     return res.user;
   };
 
+  const requestRegistrationOtp = async (data) => {
+    const res = await sendRegistrationOtp(data);
+    showToast(res.message || "Verification code sent!");
+    return res;
+  };
+
+  const confirmRegistrationOtp = async ({ email, otp_code }) => {
+    const res = await verifyRegistrationOtp({ email, otp_code });
+    localStorage.setItem("pahadily_token", res.token);
+    setToken(res.token);
+    setUser(res.user);
+    setAuthModalOpen(false);
+    showToast(`Account verified! Welcome to Pahadíly, ${res.user.full_name}!`);
+    return res.user;
+  };
+
   const demoLogin = async (role = "traveler") => {
     const res = await demoLoginUser(role);
     localStorage.setItem("pahadily_token", res.token);
@@ -114,6 +130,8 @@ export function AuthProvider({ children }) {
     isHost: user?.role === "host" || user?.role === "admin",
     login,
     signup,
+    requestRegistrationOtp,
+    confirmRegistrationOtp,
     demoLogin,
     logout,
     authModalOpen,

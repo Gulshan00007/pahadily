@@ -36,15 +36,15 @@ function ImpactSection() {
                 Support local communities, preserve hidden places, and be a part of a kinder travel culture.
               </p>
 
-              <a href="#learn-more" className="impact-btn">
-                Learn More <span className="btn-arrow">→</span>
+              <a href="/explore" className="impact-btn">
+                Explore Valleys <span className="btn-arrow">→</span>
               </a>
             </div>
           </div>
 
           {/* Right Column: Key Stats with Vertical Dividers */}
           <div className="impact-stats-row">
-            {/* Stat 1: Travellers */}
+            {/* Stat 1: Community Led */}
             <div className="stat-col">
               <div className="stat-icon-wrap">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#254a3a" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
@@ -54,22 +54,22 @@ function ImpactSection() {
                   <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                 </svg>
               </div>
-              <div className="stat-number">5,000+</div>
-              <div className="stat-label">Happy Travellers</div>
+              <div className="stat-number">100%</div>
+              <div className="stat-label">Direct to Locals</div>
             </div>
 
             <div className="stat-divider" aria-hidden="true"></div>
 
-            {/* Stat 2: Hosts */}
+            {/* Stat 2: Middleman */}
             <div className="stat-col">
               <div className="stat-icon-wrap">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#254a3a" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                  <polyline points="9 22 9 12 15 12 15 22" />
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
                 </svg>
               </div>
-              <div className="stat-number">150+</div>
-              <div className="stat-label">Local Hosts</div>
+              <div className="stat-number">0%</div>
+              <div className="stat-label">Middleman Fees</div>
             </div>
 
             <div className="stat-divider" aria-hidden="true"></div>
@@ -81,8 +81,8 @@ function ImpactSection() {
                   <path d="m8 3 4 8 5-5 5 15H2L8 3z" />
                 </svg>
               </div>
-              <div className="stat-number">50+</div>
-              <div className="stat-label">Hidden Destinations</div>
+              <div className="stat-number">8+</div>
+              <div className="stat-label">Pristine Valleys</div>
             </div>
 
             <div className="stat-divider" aria-hidden="true"></div>
@@ -102,6 +102,7 @@ function ImpactSection() {
           </div>
         </div>
       </div>
+
 
       {/* Atmospheric Pine Forest & Misty Mountain Skyline at Bottom */}
       <div className="footer-forest-backdrop" aria-hidden="true">

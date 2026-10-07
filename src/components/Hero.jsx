@@ -18,12 +18,14 @@ function Hero() {
     <section className="hero-section">
       <div className="hero-media-wrapper">
         <img
-          src="/images/hero/himachal-hero.jpg"
-          alt="Breathtaking Himalayan mountain peaks and green valley"
+          src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=2000&q=85"
+          onError={(e) => { e.currentTarget.src = "/images/hero/himachal-hero.jpg"; }}
+          alt="Breathtaking snow-capped Himalayan mountain peaks and green valley"
           className="hero-backdrop-img"
         />
         <div className="hero-gradient-overlay"></div>
       </div>
+
 
       {/* Floating handwritten note on the right */}
       <div className="hero-script-note" aria-hidden="true">

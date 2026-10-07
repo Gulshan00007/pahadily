@@ -4,6 +4,7 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { useAuth } from "../context/AuthContext";
 import { getPlaces } from "../lib/api";
+import NearbySlideshow from "../components/booking/NearbySlideshow";
 
 const VALLEY_INFO = {
   all: {
@@ -200,6 +201,19 @@ function BookStayPage() {
   const [categoryFilter, setCategoryFilter] = useState(initialCat);
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [sortBy, setSortBy] = useState("rating");
+
+  // Nearby slideshow state
+  const [slideshowOpen, setSlideshowOpen] = useState(false);
+  const [slideshowTarget, setSlideshowTarget] = useState(null);
+
+  const handleBookStayClick = (stay) => {
+    setSlideshowTarget(stay);
+    setSlideshowOpen(true);
+  };
+
+  const handleProceedToBook = (stay) => {
+    openBooking(stay, "place");
+  };
 
   useEffect(() => {
     async function loadPlaces() {
@@ -577,7 +591,7 @@ function BookStayPage() {
                         <button
                           type="button"
                           className="btn-book-now"
-                          onClick={() => openBooking(stay, "place")}
+                          onClick={() => handleBookStayClick(stay)}
                         >
                           <span>Book Stay</span>
                           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -612,6 +626,14 @@ function BookStayPage() {
       </main>
 
       <Footer />
+
+      {/* Nearby Slideshow Modal */}
+      <NearbySlideshow
+        isOpen={slideshowOpen}
+        onClose={() => setSlideshowOpen(false)}
+        place={slideshowTarget}
+        onProceedToBook={handleProceedToBook}
+      />
     </div>
   );
 }

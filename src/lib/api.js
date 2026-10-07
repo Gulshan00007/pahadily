@@ -33,6 +33,28 @@ export async function signupUser({ email, password, full_name, phone, role = "tr
   return data;
 }
 
+export async function sendRegistrationOtp({ email, password, full_name, phone, role = "traveler" }) {
+  const response = await fetch(`${API_BASE_URL}/api/auth/send-registration-otp`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password, full_name, phone, role }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || "Failed to send verification code");
+  return data;
+}
+
+export async function verifyRegistrationOtp({ email, otp_code }) {
+  const response = await fetch(`${API_BASE_URL}/api/auth/verify-registration-otp`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, otp_code }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || "Verification failed");
+  return data;
+}
+
 export async function demoLoginUser(role = "traveler") {
   const response = await fetch(`${API_BASE_URL}/api/auth/demo-login?role=${role}`, {
     method: "POST",
@@ -108,6 +130,17 @@ export async function deletePlace(id) {
   });
   if (!response.ok) throw new Error("Failed to delete place");
   return response.json();
+}
+
+export async function updatePlaceDynamicDetails(id, { nearby_locations, stay_options }) {
+  const response = await fetch(`${API_BASE_URL}/api/places/${id}/dynamic-details`, {
+    method: "PATCH",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ nearby_locations, stay_options }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || "Failed to update dynamic details");
+  return data;
 }
 
 // --- Experiences (Dynamic) ---
@@ -330,7 +363,7 @@ export async function deleteBooking(id) {
 export async function createHostApplication(payload) {
   const response = await fetch(`${API_BASE_URL}/api/host-applications`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify(payload),
   });
   const data = await response.json();
@@ -346,13 +379,32 @@ export async function getHostApplications() {
   return response.json();
 }
 
-export async function updateHostApplicationStatus(id, statusVal) {
-  const response = await fetch(`${API_BASE_URL}/api/host-applications/${id}/status?status_val=${statusVal}`, {
+export async function getMyHostSubmissions() {
+  const response = await fetch(`${API_BASE_URL}/api/host-applications/my-submissions`, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) throw new Error("Could not load your host submissions");
+  return response.json();
+}
+
+export async function updateHostApplicationStatus(id, statusVal, adminNotes = null) {
+  const notesParam = adminNotes ? `&admin_notes=${encodeURIComponent(adminNotes)}` : "";
+  const response = await fetch(`${API_BASE_URL}/api/host-applications/${id}/status?status_val=${statusVal}${notesParam}`, {
     method: "PATCH",
     headers: getAuthHeaders(),
   });
   const data = await response.json();
   if (!response.ok) throw new Error(data.detail || "Failed to update host application");
+  return data;
+}
+
+export async function deleteHostApplication(id) {
+  const response = await fetch(`${API_BASE_URL}/api/host-applications/${id}`, {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || "Failed to delete host application");
   return data;
 }
 

@@ -64,88 +64,107 @@ function Navbar({ activePage = "home" }) {
           </a>
           {/* Only visible to authenticated Admin or Host */}
           {(isAdmin || isHost) && (
-            <a href="/admin" className={`nav-link admin-nav-link${activePage === "admin" ? " active" : ""}`}>
-              ⚡ Host / Admin Portal
-            </a>
+            <>
+              <a href="/host" className={`nav-link host-nav-pill${activePage === "host" ? " active" : ""}`}>
+                🏡 List Your Stay
+              </a>
+              <a href="/admin" className={`nav-link admin-nav-link${activePage === "admin" ? " active" : ""}`}>
+                ⚡ Platform Operations
+              </a>
+            </>
           )}
         </nav>
 
         {/* Action Buttons / User Menu */}
         <div className="navbar-actions">
           {isAuthenticated ? (
-            <div className="navbar-user-menu" ref={dropdownRef}>
-              <button
-                type="button"
-                className="user-profile-trigger"
-                onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                aria-expanded={userDropdownOpen}
-              >
-                <div className="navbar-avatar-circle">
-                  <span>{userInitials}</span>
-                </div>
-                <div className="user-name-col">
-                  <span className="user-nav-name">{user.full_name.split(" ")[0]}</span>
-                  <span className="user-nav-role">{user.role}</span>
-                </div>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              </button>
-
-              {userDropdownOpen && (
-                <div className="user-dropdown-menu">
-                  <div className="user-dropdown-header">
-                    <strong>{user.full_name}</strong>
-                    <span className="user-dropdown-email">{user.email}</span>
-                  </div>
-
-                  <div className="user-dropdown-divider" />
-
-                  <button
-                    type="button"
-                    className="dropdown-item"
-                    onClick={() => {
-                      setUserDropdownOpen(false);
-                      setMyBookingsOpen(true);
-                    }}
-                  >
-                    <span>📅 My Bookings & Trips</span>
-                  </button>
-
-                  {(isAdmin || isHost) && (
-                    <a
-                      href="/admin"
-                      className="dropdown-item"
-                      onClick={() => setUserDropdownOpen(false)}
-                    >
-                      <span>⚙️ Platform & Host Portal</span>
-                    </a>
-                  )}
-
-                  <div className="user-dropdown-divider" />
-
-                  <button
-                    type="button"
-                    className="dropdown-item logout"
-                    onClick={() => {
-                      setUserDropdownOpen(false);
-                      logout();
-                    }}
-                  >
-                    <span>🚪 Log Out</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="auth-action-buttons">
+            <div className="auth-authenticated-actions">
               <button
                 type="button"
                 className="my-bookings-nav-btn"
                 onClick={() => setMyBookingsOpen(true)}
               >
-                My Trips
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+                </svg>
+                <span>My Trips</span>
               </button>
+
+              <div className="navbar-user-menu" ref={dropdownRef}>
+                <button
+                  type="button"
+                  className="user-profile-trigger"
+                  onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                  aria-expanded={userDropdownOpen}
+                >
+                  <div className="navbar-avatar-circle">
+                    <span>{userInitials}</span>
+                  </div>
+                  <div className="user-name-col">
+                    <span className="user-nav-name">{user.full_name.split(" ")[0]}</span>
+                    <span className="user-nav-role">{user.role}</span>
+                  </div>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+
+                {userDropdownOpen && (
+                  <div className="user-dropdown-menu">
+                    <div className="user-dropdown-header">
+                      <strong>{user.full_name}</strong>
+                      <span className="user-dropdown-email">{user.email}</span>
+                    </div>
+
+                    <div className="user-dropdown-divider" />
+
+                    <button
+                      type="button"
+                      className="dropdown-item"
+                      onClick={() => {
+                        setUserDropdownOpen(false);
+                        setMyBookingsOpen(true);
+                      }}
+                    >
+                      <span>📅 My Bookings & Trips</span>
+                    </button>
+
+                    <a
+                      href="/host"
+                      className="dropdown-item"
+                      onClick={() => setUserDropdownOpen(false)}
+                    >
+                      <span>🏡 Host Portal & List Stay</span>
+                    </a>
+
+                    {(isAdmin || isHost) && (
+                      <a
+                        href="/admin"
+                        className="dropdown-item"
+                        onClick={() => setUserDropdownOpen(false)}
+                      >
+                        <span>⚙️ Platform Operations</span>
+                      </a>
+                    )}
+
+                    <div className="user-dropdown-divider" />
+
+                    <button
+                      type="button"
+                      className="dropdown-item logout"
+                      onClick={() => {
+                        setUserDropdownOpen(false);
+                        logout();
+                      }}
+                    >
+                      <span>🚪 Log Out</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="auth-action-buttons">
               <button
                 type="button"
                 className="login-button"

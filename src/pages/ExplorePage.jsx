@@ -8,7 +8,12 @@ import ExploreMapPanel from "../components/explore/ExploreMapPanel";
 
 function ExplorePage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialCategory = searchParams.get("category") || searchParams.get("filter") || "all";
+  const initialCategory =
+    searchParams.get("valley") ||
+    searchParams.get("region") ||
+    searchParams.get("category") ||
+    searchParams.get("filter") ||
+    "all";
   const initialQuery = searchParams.get("q") || "";
 
   const [activeFilter, setActiveFilter] = useState(initialCategory);
@@ -17,9 +22,13 @@ function ExplorePage() {
   const [searchQuery, setSearchQuery] = useState(initialQuery);
 
   useEffect(() => {
-    const cat = searchParams.get("category") || searchParams.get("filter");
-    if (cat && cat !== activeFilter) {
-      setActiveFilter(cat);
+    const valleyOrCat =
+      searchParams.get("valley") ||
+      searchParams.get("region") ||
+      searchParams.get("category") ||
+      searchParams.get("filter");
+    if (valleyOrCat && valleyOrCat !== activeFilter) {
+      setActiveFilter(valleyOrCat);
     }
     const q = searchParams.get("q");
     if (q !== null && q !== searchQuery) {
@@ -30,10 +39,18 @@ function ExplorePage() {
   const handleFilterChange = (newFilter) => {
     setActiveFilter(newFilter);
     if (newFilter === "all") {
+      searchParams.delete("valley");
+      searchParams.delete("region");
       searchParams.delete("category");
       searchParams.delete("filter");
-    } else {
+    } else if (newFilter === "homestay" || newFilter === "campsite") {
+      searchParams.delete("valley");
+      searchParams.delete("region");
       searchParams.set("category", newFilter);
+    } else {
+      searchParams.delete("category");
+      searchParams.delete("filter");
+      searchParams.set("valley", newFilter);
     }
     setSearchParams(searchParams, { replace: true });
   };
@@ -75,7 +92,10 @@ function ExplorePage() {
               />
             </div>
             <aside className="explore-map-col">
-              <ExploreMapPanel />
+              <ExploreMapPanel
+                activeValley={activeFilter}
+                onSelectValley={handleFilterChange}
+              />
             </aside>
           </div>
         </section>
