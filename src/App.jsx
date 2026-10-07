@@ -2,8 +2,6 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import Navbar from "./components/Navbar";
 import Hero from "./components/Hero";
-import StartupPillars from "./components/StartupPillars";
-import HostOnboarding from "./components/HostOnboarding";
 import FeaturedDestinations from "./components/FeaturedDestinations";
 import ImpactSection from "./components/ImpactSection";
 import Footer from "./components/Footer";
@@ -24,15 +22,12 @@ function HomePage() {
       <main>
         <Hero />
         <FeaturedDestinations />
-        <StartupPillars />
-        <HostOnboarding />
         <ImpactSection />
       </main>
       <Footer />
     </div>
   );
 }
-
 
 function App() {
   return (

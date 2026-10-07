@@ -1,12 +1,16 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 function Hero() {
-  const [selectedValley, setSelectedValley] = useState('all');
+  const [searchValue, setSearchValue] = useState('');
+  const navigate = useNavigate();
 
-  const scrollToSection = (id) => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (searchValue.trim()) {
+      navigate(`/book-stay?q=${encodeURIComponent(searchValue.trim())}`);
+    } else {
+      navigate('/book-stay');
     }
   };
 
@@ -23,75 +27,99 @@ function Hero() {
 
       {/* Floating handwritten note on the right */}
       <div className="hero-script-note" aria-hidden="true">
-        <span className="script-line-1">Raw</span>
+        <span className="script-line-1">More</span>
         <span className="script-line-2">Mountains</span>
-        <span className="script-line-3">Real Stories</span>
+        <span className="script-line-3">More Meaning</span>
       </div>
 
       <div className="hero-container">
         <div className="hero-content-col">
-          <div className="startup-badge">
-            <span className="startup-badge-dot"></span>
-            <span>EARLY ACCESS PLATFORM · HIMALAYAN NETWORK 2026</span>
-          </div>
+          <p className="hero-eyebrow">HIDDEN HIMALAYAS AWAIT</p>
 
           <h1 className="hero-heading">
-            Connecting Conscious Travelers With
-            <span className="hero-heading-rare"> Untouched Valleys</span>
+            Discover
+            <span className="hero-heading-rare">Rare Places</span>
           </h1>
 
           <p className="hero-lead">
-            We are building a community-owned mountain network across Himachal & Uttarakhand. Direct support for native families, slow travel, and zero corporate intermediaries.
+            Travel deeper with locals,
+            <br />
+            not just guidebooks.
           </p>
 
-          {/* Startup Hero Actions */}
-          <div className="hero-startup-actions">
-            <button
-              type="button"
-              className="hero-primary-cta"
-              onClick={() => scrollToSection('valleys')}
-            >
-              <span>Explore Mountain Valleys</span>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <polyline points="19 12 12 19 5 12"></polyline>
+          {/* Search Box */}
+          <form className="hero-search-bar" onSubmit={handleSearch}>
+            <div className="search-input-prefix">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#2d5341"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
+            </div>
+            <input
+              type="text"
+              placeholder="Search homestays, campsites, valleys..."
+              value={searchValue}
+              onChange={(e) => setSearchValue(e.target.value)}
+              className="hero-search-input"
+            />
+            <button type="submit" className="hero-search-btn">
+              Explore <span className="btn-arrow">→</span>
             </button>
+          </form>
 
-            <button
-              type="button"
-              className="hero-secondary-cta"
-              onClick={() => scrollToSection('host-onboarding')}
-            >
-              <span>List Your Mountain Sanctuary</span>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-                <polyline points="12 5 19 12 12 19"></polyline>
-              </svg>
-            </button>
-          </div>
+          {/* Quick Categories */}
+          <div className="hero-categories">
+            <a href="/book-stay?type=homestay" className="hero-cat-item">
+              <div className="cat-icon-wrap">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                  <polyline points="9 22 9 12 15 12 15 22" />
+                </svg>
+              </div>
+              <span className="cat-label">Homestays</span>
+            </a>
 
-          {/* Live Startup Metrics Bar */}
-          <div className="hero-metrics-strip">
-            <div className="metric-pill">
-              <span className="metric-val">8</span>
-              <span className="metric-txt">Pristine Valleys</span>
-            </div>
-            <div className="metric-pill-divider"></div>
-            <div className="metric-pill">
-              <span className="metric-val">100%</span>
-              <span className="metric-txt">Native Led</span>
-            </div>
-            <div className="metric-pill-divider"></div>
-            <div className="metric-pill">
-              <span className="metric-val">0%</span>
-              <span className="metric-txt">Middleman Fee</span>
-            </div>
-            <div className="metric-pill-divider"></div>
-            <div className="metric-pill">
-              <span className="metric-val">Phase 1</span>
-              <span className="metric-txt">Early Launch</span>
-            </div>
+            <a href="/book-stay?type=campsite" className="hero-cat-item">
+              <div className="cat-icon-wrap">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m8 3 4 8 5-5 5 15H2L8 3z" />
+                </svg>
+              </div>
+              <span className="cat-label">Campsites</span>
+            </a>
+
+            <a href="/experiences" className="hero-cat-item">
+              <div className="cat-icon-wrap">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="5" r="2" />
+                  <path d="m9 20 3-6 2 3 3 5" />
+                  <path d="m6 10 3-1 3 3 4-2" />
+                  <line x1="18" y1="12" x2="20" y2="21" />
+                </svg>
+              </div>
+              <span className="cat-label">Experiences</span>
+            </a>
+
+            <a href="/locals" className="hero-cat-item">
+              <div className="cat-icon-wrap">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+              </div>
+              <span className="cat-label">Guides</span>
+            </a>
           </div>
         </div>
       </div>
