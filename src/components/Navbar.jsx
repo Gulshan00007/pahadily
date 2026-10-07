@@ -62,16 +62,17 @@ function Navbar({ activePage = "home" }) {
           <a href="/locals" className={`nav-link${activePage === "locals" ? " active" : ""}`}>
             Local Guides
           </a>
-          {/* Only visible to authenticated Admin or Host */}
+          {/* Visible to authenticated Admin or Host */}
           {(isAdmin || isHost) && (
-            <>
-              <a href="/host" className={`nav-link host-nav-pill${activePage === "host" ? " active" : ""}`}>
-                🏡 List Your Stay
-              </a>
-              <a href="/admin" className={`nav-link admin-nav-link${activePage === "admin" ? " active" : ""}`}>
-                ⚡ Platform Operations
-              </a>
-            </>
+            <a href="/host" className={`nav-link host-nav-pill${activePage === "host" ? " active" : ""}`}>
+              🏡 List Your Stay
+            </a>
+          )}
+          {/* Visible strictly to authenticated Admin */}
+          {isAdmin && (
+            <a href="/admin" className={`nav-link admin-nav-link${activePage === "admin" ? " active" : ""}`}>
+              ⚡ Platform Operations
+            </a>
           )}
         </nav>
 
@@ -129,15 +130,17 @@ function Navbar({ activePage = "home" }) {
                       <span>📅 My Bookings & Trips</span>
                     </button>
 
-                    <a
-                      href="/host"
-                      className="dropdown-item"
-                      onClick={() => setUserDropdownOpen(false)}
-                    >
-                      <span>🏡 Host Portal & List Stay</span>
-                    </a>
-
                     {(isAdmin || isHost) && (
+                      <a
+                        href="/host"
+                        className="dropdown-item"
+                        onClick={() => setUserDropdownOpen(false)}
+                      >
+                        <span>🏡 Host Portal & List Stay</span>
+                      </a>
+                    )}
+
+                    {isAdmin && (
                       <a
                         href="/admin"
                         className="dropdown-item"
@@ -231,8 +234,13 @@ function Navbar({ activePage = "home" }) {
             Local Guides
           </a>
           {(isAdmin || isHost) && (
+            <a href="/host" onClick={() => setMobileMenuOpen(false)}>
+              🏡 Host Portal (List Stay)
+            </a>
+          )}
+          {isAdmin && (
             <a href="/admin" onClick={() => setMobileMenuOpen(false)}>
-              ⚡ Host / Admin Portal
+              ⚙️ Platform Operations
             </a>
           )}
           <div className="mobile-dropdown-actions">

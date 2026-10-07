@@ -132,7 +132,7 @@ function AdminPage() {
 
   // Load data when authorized
   const loadData = async () => {
-    if (!isAdmin && !isHost) return;
+    if (!isAdmin) return;
     setLoading(true);
     try {
       const s = await getStats().catch(() => ({}));
@@ -191,7 +191,6 @@ function AdminPage() {
     userSearchQuery,
     user,
     isAdmin,
-    isHost,
   ]);
 
   // Handle Admin Gate Login
@@ -201,8 +200,8 @@ function AdminPage() {
     setGateSubmitting(true);
     try {
       const loggedUser = await login(adminEmail, adminPassword);
-      if (loggedUser.role !== "admin" && loggedUser.role !== "host") {
-        setGateError("Access restricted. This account does not have Admin or Host permissions.");
+      if (loggedUser.role !== "admin") {
+        setGateError("Access restricted. This page is strictly for Platform Administrators.");
       } else {
         showToast(`Welcome to Platform Control, ${loggedUser.full_name}!`);
       }
@@ -568,28 +567,61 @@ function AdminPage() {
     }
   };
 
-  // --- ACCESS GATE FOR UNAUTHENTICATED USERS ---
-  if (!isAdmin && !isHost) {
+  // --- ACCESS GATE: HOST ATTEMPTING ADMIN ACCESS ---
+  if (user && isHost && !isAdmin) {
     return (
       <div className="pahadily-app">
         <Navbar activePage="admin" />
         <main className="admin-gate-page">
           <div className="admin-gate-card">
             <div className="admin-gate-header">
-              <div className="admin-gate-icon">🔐</div>
-              <h2>Host & Platform Control</h2>
-              <p>Sign in with verified administrator or host credentials to access platform management.</p>
+              <div className="admin-gate-icon">🏡</div>
+              <h2>Host Account Detected</h2>
+              <p>
+                Platform Operations & Financial Management is strictly restricted to Platform Administrators.
+              </p>
+              <p style={{ marginTop: "12px", color: "#2b7050", fontSize: "0.92rem", lineHeight: "1.5" }}>
+                As a Mountain Host, please use your dedicated <strong>Host Portal</strong> to list stays, manage details, and track approval status.
+              </p>
+            </div>
+            <div style={{ marginTop: "24px", display: "flex", justifyContent: "center" }}>
+              <a
+                href="/host"
+                className="admin-gate-btn"
+                style={{ display: "inline-block", textDecoration: "none", textAlign: "center", width: "auto", padding: "12px 28px" }}
+              >
+                Go to Host Portal (List Your Stay) →
+              </a>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  // --- ACCESS GATE FOR NON-ADMINISTRATORS ---
+  if (!isAdmin) {
+    return (
+      <div className="pahadily-app">
+        <Navbar activePage="admin" />
+        <main className="admin-gate-page">
+          <div className="admin-gate-card">
+            <div className="admin-gate-header">
+              <div className="admin-gate-icon">👑</div>
+              <h2>Platform Administrator Access</h2>
+              <p>Sign in with verified administrator credentials to access platform management.</p>
             </div>
 
             {gateError && <div className="admin-gate-error">{gateError}</div>}
 
             <form onSubmit={handleGateLogin} className="admin-gate-form">
               <div className="admin-form-group">
-                <label>Admin / Host Email</label>
+                <label>Administrator Email</label>
                 <input
                   type="email"
                   required
-                  placeholder="admin@pahadily.com or host@pahadily.com"
+                  placeholder="admin@pahadily.com"
                   value={adminEmail}
                   onChange={(e) => setAdminEmail(e.target.value)}
                   className="admin-input"
@@ -629,7 +661,7 @@ function AdminPage() {
           <div className="admin-header-container">
             <div className="admin-badge-row">
               <span className="admin-role-badge">
-                {isAdmin ? "👑 Platform Administrator" : "🏡 Verified Native Host"}
+                👑 Master Platform Administrator
               </span>
               <span className="admin-live-pulse">
                 <span className="dot"></span> Live Sync Active
