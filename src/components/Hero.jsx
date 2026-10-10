@@ -8,9 +8,9 @@ function Hero() {
   const handleSearch = (e) => {
     e.preventDefault();
     if (searchValue.trim()) {
-      navigate(`/book-stay?q=${encodeURIComponent(searchValue.trim())}`);
+      navigate(`/explore?q=${encodeURIComponent(searchValue.trim())}`);
     } else {
-      navigate('/book-stay');
+      navigate('/explore');
     }
   };
 
@@ -80,7 +80,7 @@ function Hero() {
 
           {/* Quick Categories */}
           <div className="hero-categories">
-            <a href="/book-stay?type=homestay" className="hero-cat-item">
+            <a href="/explore?category=homestay" className="hero-cat-item">
               <div className="cat-icon-wrap">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
@@ -90,7 +90,7 @@ function Hero() {
               <span className="cat-label">Homestays</span>
             </a>
 
-            <a href="/book-stay?type=campsite" className="hero-cat-item">
+            <a href="/explore?category=campsite" className="hero-cat-item">
               <div className="cat-icon-wrap">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="m8 3 4 8 5-5 5 15H2L8 3z" />

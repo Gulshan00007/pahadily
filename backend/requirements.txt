@@ -1,5 +1,0 @@
-fastapi==0.117.1
-uvicorn[standard]==0.36.0
-SQLAlchemy==2.0.44
-psycopg[binary]==3.2.10
-email-validator==2.3.0

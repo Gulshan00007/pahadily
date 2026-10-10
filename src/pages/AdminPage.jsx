@@ -54,6 +54,7 @@ function AdminPage() {
   // Users state
   const [usersList, setUsersList] = useState([]);
   const [userRoleFilter, setUserRoleFilter] = useState("all");
+  const [userVerifiedFilter, setUserVerifiedFilter] = useState("all");
   const [userSearchQuery, setUserSearchQuery] = useState("");
 
   // Bookings state
@@ -157,6 +158,7 @@ function AdminPage() {
       } else if (activeTab === "users") {
         const u = await getUsers({
           role: userRoleFilter,
+          verified: userVerifiedFilter,
           q: userSearchQuery,
         });
         setUsersList(u);
@@ -188,6 +190,7 @@ function AdminPage() {
     bookingPaymentFilter,
     bookingSearchQuery,
     userRoleFilter,
+    userVerifiedFilter,
     userSearchQuery,
     user,
     isAdmin,
@@ -251,6 +254,26 @@ function AdminPage() {
       loadData();
     } catch (err) {
       showToast(err.message || "Failed to delete user", "error");
+    }
+  };
+
+  const handleCleanUnverifiedUsers = async () => {
+    const unverifiedList = usersList.filter((u) => !u.is_verified && u.id !== user.id);
+    if (unverifiedList.length === 0) {
+      showToast("No unverified user accounts found.", "info");
+      return;
+    }
+    if (!window.confirm(`Clean and delete ${unverifiedList.length} unverified account(s)?`)) return;
+    try {
+      let deletedCount = 0;
+      for (const u of unverifiedList) {
+        await deleteUser(u.id);
+        deletedCount++;
+      }
+      showToast(`Cleaned ${deletedCount} unverified account(s) successfully.`);
+      loadData();
+    } catch (err) {
+      showToast(err.message || "Failed to clean unverified users", "error");
     }
   };
 
@@ -1036,6 +1059,23 @@ function AdminPage() {
                     <option value="host">Hosts</option>
                     <option value="admin">Administrators</option>
                   </select>
+                  <select
+                    value={userVerifiedFilter}
+                    onChange={(e) => setUserVerifiedFilter(e.target.value)}
+                    className="admin-filter-select"
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="true">✓ Verified Only</option>
+                    <option value="false">Unverified Only</option>
+                  </select>
+                  <button
+                    type="button"
+                    className="admin-action-btn clean-unverified"
+                    onClick={handleCleanUnverifiedUsers}
+                    title="Remove unverified accounts from the system"
+                  >
+                    🧹 Clean Unverified Data
+                  </button>
                 </div>
               </div>
 

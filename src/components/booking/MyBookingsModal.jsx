@@ -85,7 +85,7 @@ function MyBookingsModal() {
 
         {!user ? (
           <div className="my-bookings-empty-guest">
-            <p>Please log in or select a demo profile to view your personal bookings and payment vouchers.</p>
+            <p>Please log in to your account to view your personal bookings and payment vouchers.</p>
             <button
               className="btn-login-prompt"
               onClick={() => {
@@ -93,7 +93,7 @@ function MyBookingsModal() {
                 openAuthModal("login");
               }}
             >
-              Log In / Select Demo Profile
+              Sign In to Your Account
             </button>
           </div>
         ) : loading ? (

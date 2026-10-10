@@ -10,7 +10,6 @@ function AuthModal() {
     login,
     requestRegistrationOtp,
     confirmRegistrationOtp,
-    demoLogin,
   } = useAuth();
 
   const [email, setEmail] = useState("");
@@ -113,18 +112,6 @@ function AuthModal() {
     }
   };
 
-  const handleDemoClick = async (demoRole) => {
-    setError("");
-    setSubmitting(true);
-    try {
-      await demoLogin(demoRole);
-    } catch (err) {
-      setError(err.message || "Demo login unavailable.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   return (
     <div className="pahadily-modal-overlay" onClick={() => setAuthModalOpen(false)}>
       <div className="auth-modal-card" onClick={(e) => e.stopPropagation()}>
@@ -172,36 +159,9 @@ function AuthModal() {
             className={`auth-tab-btn ${authModalTab === "signup" ? "active" : ""}`}
             onClick={() => setAuthModalTab("signup")}
           >
-            Create Account (OTP)
+            Create Account
           </button>
         </div>
-
-        {/* Public Demo Fast Login Bar */}
-        {authModalTab === "login" && (
-          <div className="auth-demo-section">
-            <span className="demo-label">⚡ 1-Click Prototype Logins:</span>
-            <div className="demo-buttons-row">
-              <button
-                type="button"
-                className="demo-pill-btn traveler"
-                disabled={submitting}
-                onClick={() => handleDemoClick("traveler")}
-                title="Log in as Traveler Aarav Sharma"
-              >
-                🧑 Traveler Demo
-              </button>
-              <button
-                type="button"
-                className="demo-pill-btn host"
-                disabled={submitting}
-                onClick={() => handleDemoClick("host")}
-                title="Log in as Host Karan Negi"
-              >
-                🏡 Host Demo
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Status Notice */}
         {otpNotice && (
@@ -244,7 +204,7 @@ function AuthModal() {
 
               {otpHint && (
                 <div className="otp-demo-hint">
-                  <span>Demo Simulator OTP: <strong>{otpHint}</strong></span>
+                  <span>Verification Code: <strong>{otpHint}</strong></span>
                   <button
                     type="button"
                     className="btn-autofill-otp"

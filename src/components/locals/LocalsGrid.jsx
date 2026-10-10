@@ -77,7 +77,7 @@ export const ALL_LOCALS = [
     unit: "/day",
     tags: ["Nature Walks", "Viewpoints", "Old Manali Trails"],
     image: null,
-    verified: false,
+    verified: true,
     certified: false,
     gradient: "linear-gradient(135deg,#c07028,#e8a84a)",
     bio: "Pooja leads tranquil walks away from crowded tourist hubs, showing you ancient deodar groves, riverside cafes, and quiet viewpoints.",

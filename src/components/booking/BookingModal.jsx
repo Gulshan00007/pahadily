@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { createBooking } from "../../lib/api";
+import StaySlideshowBookingModal from "./StaySlideshowBookingModal";
 
 function BookingModal() {
   const {
@@ -70,6 +71,18 @@ function BookingModal() {
   }, [bookingModalOpen, setBookingModalOpen]);
 
   if (!bookingModalOpen || !item) return null;
+
+  // Use the integrated Slideshow & Booking System Form for Stays & Places
+  if (bookingType === "place") {
+    return (
+      <StaySlideshowBookingModal
+        isOpen={bookingModalOpen}
+        onClose={() => setBookingModalOpen(false)}
+        place={item}
+        initialStayOption={item.selectedOption || null}
+      />
+    );
+  }
 
   const itemTitle = item.name || item.title || "Mountain Experience";
   const itemImage =

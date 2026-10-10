@@ -6,7 +6,6 @@ import FeaturedDestinations from "./components/FeaturedDestinations";
 import ImpactSection from "./components/ImpactSection";
 import Footer from "./components/Footer";
 import ExplorePage from "./pages/ExplorePage";
-import BookStayPage from "./pages/BookStayPage";
 import ExperiencesPage from "./pages/ExperiencesPage";
 import LocalsPage from "./pages/LocalsPage";
 import AdminPage from "./pages/AdminPage";
@@ -36,9 +35,9 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<HomePage />} />
-          <Route path="/book-stay" element={<BookStayPage />} />
-          <Route path="/book" element={<BookStayPage />} />
-          <Route path="/stays" element={<BookStayPage />} />
+          <Route path="/book-stay" element={<ExplorePage />} />
+          <Route path="/book" element={<ExplorePage />} />
+          <Route path="/stays" element={<ExplorePage />} />
           <Route path="/explore" element={<ExplorePage />} />
           <Route path="/experiences" element={<ExperiencesPage />} />
           <Route path="/locals" element={<LocalsPage />} />

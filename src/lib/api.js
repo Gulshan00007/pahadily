@@ -1,4 +1,4 @@
-const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
+const API_BASE_URL = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
 
 function getAuthHeaders() {
   const token = localStorage.getItem("pahadily_token");
@@ -250,6 +250,7 @@ export async function deleteLocal(id) {
 export async function getUsers(params = {}) {
   const searchParams = new URLSearchParams();
   if (params.role && params.role !== "all") searchParams.set("role", params.role);
+  if (params.verified && params.verified !== "all") searchParams.set("verified", params.verified);
   if (params.q?.trim()) searchParams.set("q", params.q.trim());
 
   const query = searchParams.toString();

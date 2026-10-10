@@ -747,8 +747,8 @@ function HostPortalPage() {
                         {sub.published_place_id && (
                           <div className="published-banner">
                             ✨ Published live in catalog as <strong>Place #{sub.published_place_id}</strong>!
-                            <a href="/book-stay" className="view-live-link">
-                              View on Book Stay →
+                            <a href="/explore" className="view-live-link">
+                              View on Explore →
                             </a>
                           </div>
                         )}
