@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import SEO from "../components/common/SEO";
 import { useAuth } from "../context/AuthContext";
 import {
   getPlaces,
@@ -594,6 +595,7 @@ function AdminPage() {
   if (user && isHost && !isAdmin) {
     return (
       <div className="pahadily-app">
+        <SEO title="Admin Operations Portal | Pahadíly" canonicalPath="/admin" noindex={true} nofollow={true} />
         <Navbar activePage="admin" />
         <main className="admin-gate-page">
           <div className="admin-gate-card">
@@ -627,6 +629,7 @@ function AdminPage() {
   if (!isAdmin) {
     return (
       <div className="pahadily-app">
+        <SEO title="Admin Operations Portal | Pahadíly" canonicalPath="/admin" noindex={true} nofollow={true} />
         <Navbar activePage="admin" />
         <main className="admin-gate-page">
           <div className="admin-gate-card">
@@ -676,6 +679,7 @@ function AdminPage() {
 
   return (
     <div className="pahadily-app">
+      <SEO title="Admin Operations & Control Portal | Pahadíly" canonicalPath="/admin" noindex={true} nofollow={true} />
       <Navbar activePage="admin" />
 
       <main className="admin-dashboard-page">

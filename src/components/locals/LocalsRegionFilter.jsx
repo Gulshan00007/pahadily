@@ -1,4 +1,3 @@
-import { useState } from "react";
 
 const REGIONS = [
   { id: "all", label: "All Regions", count: "43 locals", img: null },

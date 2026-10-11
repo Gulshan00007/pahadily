@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import SEO from "../components/common/SEO";
 import { useAuth } from "../context/AuthContext";
 import { createHostApplication, getMyHostSubmissions, getHostApplications } from "../lib/api";
 
@@ -203,6 +204,13 @@ function HostPortalPage() {
 
   return (
     <div className="pahadily-app">
+      <SEO
+        title="Become a Native Host | Pahadíly"
+        description="Join Pahadíly as a verified native host. List your Himalayan homestay, cottage, or campsite direct to conscious mountain travelers."
+        canonicalPath="/host-portal"
+        noindex={true}
+        nofollow={false}
+      />
       <Navbar activePage="locals" />
 
       <main className="host-portal-page">
@@ -337,6 +345,16 @@ function HostPortalPage() {
                         placeholder="e.g. Hindi, Pahadi, English"
                         value={hostLanguages}
                         onChange={(e) => setHostLanguages(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="host-field">
+                      <label>Host Photo / Avatar URL (Optional)</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. /images/locals/rahul.jpg or image URL"
+                        value={hostAvatar}
+                        onChange={(e) => setHostAvatar(e.target.value)}
                       />
                     </div>
 

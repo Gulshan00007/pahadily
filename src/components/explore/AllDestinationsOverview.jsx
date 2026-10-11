@@ -285,7 +285,16 @@ function AllDestinationsOverview({
                   </div>
 
                   {/* Destination Title */}
-                  <h3 className="all-dest-card-title">{dest.name}</h3>
+                  <a
+                    href={`/destinations/${dest.slug || dest.id}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onSelectValley(dest.id);
+                    }}
+                    style={{ textDecoration: "none", color: "inherit" }}
+                  >
+                    <h3 className="all-dest-card-title">{dest.name}</h3>
+                  </a>
 
                   {/* Evocative Description with Stable Vertical Height */}
                   <p className="all-dest-card-desc" title={dest.description}>
@@ -325,31 +334,36 @@ function AllDestinationsOverview({
                     </div>
                     <div className="preview-stays-row">
                       {dest.stays?.slice(0, 2).map((st) => (
-                        <button
+                        <a
                           key={st.id}
-                          type="button"
+                          href={`/stays/${st.id}`}
                           className="preview-stay-chip"
                           onClick={(e) => {
+                            e.preventDefault();
                             e.stopPropagation();
                             if (onBookFlagshipStay) onBookFlagshipStay(st, dest);
                           }}
                           title={`Quick View & Book ${st.name}`}
+                          style={{ textDecoration: "none" }}
                         >
                           <span className="chip-stay-icon">🪵</span>
                           <span className="chip-name">{st.name}</span>
                           <span className="chip-sep">•</span>
                           <span className="chip-price">{st.price}</span>
-                        </button>
+                        </a>
                       ))}
                     </div>
                   </div>
 
                   {/* Card Action Buttons */}
                   <div className="all-dest-card-actions">
-                    <button
-                      type="button"
+                    <a
+                      href={`/destinations/${dest.slug || dest.id}`}
                       className="all-dest-btn-explore"
-                      onClick={() => onSelectValley(dest.id)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        onSelectValley(dest.id);
+                      }}
                     >
                       <span>Explore Valley</span>
                       <span className="btn-spots-badge">({attractionsCount} spots)</span>
@@ -357,7 +371,7 @@ function AllDestinationsOverview({
                         <line x1="5" y1="12" x2="19" y2="12" />
                         <polyline points="12 5 19 12 12 19" />
                       </svg>
-                    </button>
+                    </a>
 
                     {flagshipStay && (
                       <button

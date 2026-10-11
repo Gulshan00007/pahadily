@@ -2,9 +2,11 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import SEO from "../components/common/SEO";
 import { useAuth } from "../context/AuthContext";
 import { getPlaces } from "../lib/api";
 import NearbySlideshow from "../components/booking/NearbySlideshow";
+import { generateBreadcrumbSchema } from "../utils/seo";
 
 const VALLEY_INFO = {
   all: {
@@ -338,6 +340,22 @@ function BookStayPage() {
 
   return (
     <div className="pahadily-app">
+      <SEO
+        title={
+          selectedValley === "all"
+            ? "Verified Himalayan Homestays, Cottages & Camps | Pahadíly"
+            : `Stays & Camps in ${currentValleyInfo.name} | Pahadíly`
+        }
+        description={`Discover authentic mountain stays in ${currentValleyInfo.name}: ${currentValleyInfo.tagline}. Direct host bookings with zero middleman commissions.`}
+        canonicalPath="/stays"
+        ogImage={currentValleyInfo.image || "/images/hero/himachal-hero.jpg"}
+        schema={generateBreadcrumbSchema([
+          { name: "Home", url: "/" },
+          { name: "Explore", url: "/explore" },
+          { name: "Stays & Camps", url: "/stays" },
+          ...(selectedValley !== "all" ? [{ name: currentValleyInfo.name, url: `/stays?valley=${selectedValley}` }] : []),
+        ])}
+      />
       <Navbar activePage="explore" />
 
       <main className="book-stay-page">
@@ -493,7 +511,13 @@ function BookStayPage() {
           </div>
 
           {/* Listings Grid */}
-          {sortedPlaces.length === 0 ? (
+          {loading && places.length === 0 ? (
+            <div className="book-empty-state">
+              <div className="empty-icon">⏳</div>
+              <h3>Loading registered Himalayan sanctuaries...</h3>
+              <p>Fetching handpicked authentic stays directly from local hosts.</p>
+            </div>
+          ) : sortedPlaces.length === 0 ? (
             <div className="book-empty-state">
               <div className="empty-icon">🏔️</div>
               <h3>No stays found in {currentValleyInfo.name} with selected filters</h3>

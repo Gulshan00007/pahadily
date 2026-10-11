@@ -1,0 +1,30 @@
+# Pahadíly robots.txt
+# Technical search engine crawling guidelines for pahadily.com
+
+User-agent: *
+Allow: /
+Allow: /explore
+Allow: /destinations/
+Allow: /destination/
+Allow: /stays/
+Allow: /stay/
+Allow: /book-stay
+Allow: /experiences/
+Allow: /locals/
+Allow: /images/
+Allow: /public/
+
+# Disallow private operational dashboards, API endpoints, and host submission flows
+Disallow: /admin
+Disallow: /admin/
+Disallow: /host
+Disallow: /host/
+Disallow: /host-portal
+Disallow: /host-portal/
+Disallow: /become-a-host
+Disallow: /api/
+Disallow: /api/auth/
+Disallow: /api/bookings/
+
+# XML Sitemap
+Sitemap: https://pahadily.com/sitemap.xml

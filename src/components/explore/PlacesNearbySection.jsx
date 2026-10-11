@@ -1,7 +1,12 @@
 import { useState } from "react";
 
-function PlacesNearbySection({ destination, onSelectAttraction }) {
-  const [selectedAttraction, setSelectedAttraction] = useState(null);
+function PlacesNearbySection({
+  destination,
+  onSelectAttraction,
+  activeAttraction = null,
+  onCloseAttraction = null,
+}) {
+  const [internalAttraction, setInternalAttraction] = useState(null);
 
   if (!destination) return null;
 
@@ -11,9 +16,16 @@ function PlacesNearbySection({ destination, onSelectAttraction }) {
 
   if (attractions.length === 0) return null;
 
+  const selectedAttraction = activeAttraction || internalAttraction;
+
   const handleAttractionClick = (attraction) => {
-    setSelectedAttraction(attraction);
+    setInternalAttraction(attraction);
     if (onSelectAttraction) onSelectAttraction(attraction);
+  };
+
+  const handleClose = () => {
+    setInternalAttraction(null);
+    if (onCloseAttraction) onCloseAttraction();
   };
 
   return (
@@ -94,24 +106,35 @@ function PlacesNearbySection({ destination, onSelectAttraction }) {
                   {!["mountain", "lake", "park", "fort"].includes(attraction.icon) && "📍"}
                 </div>
                 <div className="attraction-title-block">
-                  <h3 className="attraction-name">{attraction.name}</h3>
+                  <a
+                    href={`/attractions/${attraction.id}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleAttractionClick(attraction);
+                    }}
+                    style={{ textDecoration: "none", color: "inherit" }}
+                  >
+                    <h3 className="attraction-name">{attraction.name}</h3>
+                  </a>
                   <span className="attraction-cat-tag">{attraction.category}</span>
                 </div>
               </div>
 
               <p className="attraction-desc">{attraction.description}</p>
 
-              <button
-                type="button"
+              <a
+                href={`/attractions/${attraction.id}`}
                 className="attraction-view-btn"
                 onClick={(e) => {
+                  e.preventDefault();
                   e.stopPropagation();
                   handleAttractionClick(attraction);
                 }}
+                style={{ textDecoration: "none" }}
               >
                 <span>View Details</span>
                 <span className="arrow">→</span>
-              </button>
+              </a>
             </div>
           </article>
         ))}
@@ -119,9 +142,9 @@ function PlacesNearbySection({ destination, onSelectAttraction }) {
 
       {/* Simple Details Popup for Attraction */}
       {selectedAttraction && (
-        <div className="attraction-modal-backdrop" onClick={() => setSelectedAttraction(null)}>
+        <div className="attraction-modal-backdrop" onClick={handleClose}>
           <div className="attraction-modal-card" onClick={(e) => e.stopPropagation()}>
-            <button className="attraction-modal-close" onClick={() => setSelectedAttraction(null)} aria-label="Close">
+            <button className="attraction-modal-close" onClick={handleClose} aria-label="Close">
               ✕
             </button>
             <img
@@ -141,7 +164,7 @@ function PlacesNearbySection({ destination, onSelectAttraction }) {
               <button
                 type="button"
                 className="attraction-modal-done-btn"
-                onClick={() => setSelectedAttraction(null)}
+                onClick={handleClose}
               >
                 Done Exploring
               </button>

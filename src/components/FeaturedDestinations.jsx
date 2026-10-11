@@ -166,7 +166,7 @@ function FeaturedDestinations() {
           {filtered.map((dest) => (
             <article key={dest.id} className="editorial-dest-card">
               <a
-                href={`/explore?valley=${dest.region}`}
+                href={`/destinations/${dest.region}`}
                 className="editorial-dest-img-link"
                 aria-label={`Explore ${dest.name}`}
               >
@@ -205,7 +205,7 @@ function FeaturedDestinations() {
                   <span>{dest.bestSeason}</span>
                 </div>
 
-                <a href={`/explore?valley=${dest.region}`} className="dest-title-link">
+                <a href={`/destinations/${dest.region}`} className="dest-title-link">
                   <h3 className="editorial-dest-name">{dest.name}</h3>
                 </a>
 
@@ -223,7 +223,7 @@ function FeaturedDestinations() {
                 {/* Footer Action */}
                 <div className="editorial-dest-footer">
                   <a
-                    href={`/explore?valley=${dest.region}`}
+                    href={`/destinations/${dest.region}`}
                     className="editorial-explore-link"
                   >
                     <span>Explore Valley & Stays</span>

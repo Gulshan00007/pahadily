@@ -64,26 +64,45 @@ PAHADILY/pahadily/
 
 ---
 
-## ⚡ Quick Start
+---
 
-### 1. Start Backend Server (Port 8000)
-```powershell
-cd backend
-python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
-```
-*Interactive Swagger API Documentation: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)*
+## ⚡ Quick Start & Development
 
-### 2. Start Frontend Server (Port 5173)
-```powershell
+### 1. Install Dependencies
+```bash
 npm install
+```
+
+### 2. Start Full-Stack Development Server (Port 3000)
+```bash
 npm run dev
 ```
-*Frontend URL: [http://localhost:5173](http://localhost:5173)*
+- App & API running at: [http://localhost:3000](http://localhost:3000)
+- The Express server (`server.ts`) mounts Vite dev middleware and serves `/api/*` endpoints.
 
-### 3. Run Automated Test Suite
-```powershell
-python backend/test_system.py
+### 3. Production Build & Sitemap Generation
+```bash
+npm run build
 ```
+- Automatically runs `node scripts/generate-sitemap.js` and `vite build`.
+- Generates a production-ready static build in `dist/` containing `index.html`, assets, `robots.txt`, and canonical `sitemap.xml`.
+
+---
+
+## 🌐 Hosting & Deployment Architecture
+
+Pahadily is designed to support both static edge deployment and containerized full-stack deployment:
+
+### Option A: Static Edge Hosting (Vercel / Netlify)
+- **Vercel**: Deploy directly with `npm run build` as build command and `dist` as output directory. `vercel.json` provides client-side SPA rewrites to `/index.html`. Vercel serves the static build via global CDN; **`server.ts` / `npm start` is not required**.
+- **Netlify / Cloudflare Pages**: Supported out of the box via `public/_redirects` (`/* /index.html 200`).
+- Configure `VITE_API_URL` to point to your deployed backend API (or leave empty if using serverless edge rewrites).
+- Configure `VITE_SITE_URL=https://pahadily.com` for production canonical URLs and sitemap generation.
+
+### Option B: Node.js / Full-Stack Hosting (Render / Railway / Docker)
+- Deploy as a Node.js web service.
+- Build command: `npm run build`
+- Start command: `npm start` (executes `node server.ts`, which serves the `/api/*` REST endpoints and static files from `dist/`).
 
 ---
 

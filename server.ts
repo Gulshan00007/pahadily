@@ -1,4 +1,5 @@
-import express, { Request, Response, NextFunction } from "express";
+import express from "express";
+import type { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import crypto from "crypto";
 import fs from "fs";
@@ -523,6 +524,28 @@ function authMiddleware(optional: boolean = false) {
     next();
   };
 }
+
+// --- Search Engine Robots & Sitemap Endpoints ---
+app.get("/robots.txt", (_req, res) => {
+  const robotsPath = path.resolve(__dirname, "public", "robots.txt");
+  if (fs.existsSync(robotsPath)) {
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    return res.sendFile(robotsPath);
+  }
+  const siteUrl = (process.env.VITE_SITE_URL || "https://pahadily.com").replace(/\/+$/, "");
+  const defaultRobots = `User-agent: *\nAllow: /\nAllow: /explore\nAllow: /destinations/\nAllow: /stays/\nAllow: /experiences/\nAllow: /locals/\nDisallow: /admin\nDisallow: /host-portal\nDisallow: /api/\nSitemap: ${siteUrl}/sitemap.xml\n`;
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
+  res.send(defaultRobots);
+});
+
+app.get("/sitemap.xml", (_req, res) => {
+  const sitemapPath = path.resolve(__dirname, "public", "sitemap.xml");
+  if (fs.existsSync(sitemapPath)) {
+    res.setHeader("Content-Type", "application/xml; charset=utf-8");
+    return res.sendFile(sitemapPath);
+  }
+  res.status(404).send("Sitemap not found");
+});
 
 // --- Health & System API Routes ---
 app.get("/healthz", (_req, res) => {

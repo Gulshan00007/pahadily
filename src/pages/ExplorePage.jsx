@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useParams, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import SEO from "../components/common/SEO";
 import ExploreHeroRef from "../components/explore/ExploreHeroRef";
 import ValleySwitcherNav from "../components/explore/ValleySwitcherNav";
 import AllDestinationsOverview from "../components/explore/AllDestinationsOverview";
@@ -11,32 +12,113 @@ import StaysNearSection from "../components/explore/StaysNearSection";
 import InPageStayBookingModal from "../components/explore/InPageStayBookingModal";
 import InteractiveMapModal from "../components/explore/InteractiveMapModal";
 import { EXPLORE_DESTINATIONS } from "../data/exploreDestinationsData";
+import {
+  generateTouristDestinationSchema,
+  generateTouristAttractionSchema,
+  generateLodgingBusinessSchema,
+  generateBreadcrumbSchema,
+  getCanonicalUrl,
+} from "../utils/seo";
+
+function findStayData(stayParam) {
+  if (!stayParam) return null;
+  const sStr = String(stayParam);
+  for (const dest of EXPLORE_DESTINATIONS) {
+    const found = dest.stays?.find((s) => String(s.id) === sStr);
+    if (found) return { stay: found, dest };
+  }
+  return null;
+}
+
+function findAttractionData(attractionParam) {
+  if (!attractionParam) return null;
+  const aLower = attractionParam.toLowerCase();
+  for (const dest of EXPLORE_DESTINATIONS) {
+    const found = dest.nearbyAttractions?.find(
+      (att) => att.id?.toLowerCase() === aLower
+    );
+    if (found) return { attraction: found, dest };
+  }
+  return null;
+}
+
+function findSlugDest(slugParam) {
+  if (!slugParam) return null;
+  const sLower = slugParam.toLowerCase();
+  return (
+    EXPLORE_DESTINATIONS.find(
+      (d) =>
+        d.slug?.toLowerCase() === sLower ||
+        d.id?.toLowerCase() === sLower ||
+        d.region?.toLowerCase() === sLower
+    ) || null
+  );
+}
 
 function ExplorePage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { slug, stayId, attractionId } = useParams();
+  const navigate = useNavigate();
 
-  // URL state
-  const initialValley =
-    searchParams.get("valley") ||
-    searchParams.get("region") ||
-    searchParams.get("location") ||
-    "all"; // Default to "all" so users see all places ready for launch!
+  const initialStayParam = stayId || searchParams.get("stay") || searchParams.get("place");
+  const matchedStayData = findStayData(initialStayParam);
+  const matchedAttractionData = findAttractionData(attractionId);
+  const matchedSlugDest =
+    matchedStayData?.dest ||
+    matchedAttractionData?.dest ||
+    findSlugDest(slug);
 
-  const initialStayParam = searchParams.get("stay") || searchParams.get("place");
+  // Initial valley selection
+  const initialValley = useMemo(() => {
+    if (matchedStayData) return matchedStayData.dest.id;
+    if (matchedAttractionData) return matchedAttractionData.dest.id;
+    if (matchedSlugDest) return matchedSlugDest.id;
+    const queryValley =
+      searchParams.get("valley") ||
+      searchParams.get("region") ||
+      searchParams.get("location");
+    return queryValley ? queryValley.toLowerCase() : "all";
+  }, [matchedStayData, matchedAttractionData, matchedSlugDest, searchParams]);
+
   const initialCategory = searchParams.get("category") || "all";
   const initialQuery = searchParams.get("q") || "";
 
-  const [selectedValleyId, setSelectedValleyId] = useState(initialValley.toLowerCase());
+  const [selectedValleyId, setSelectedValleyId] = useState(initialValley);
   const [activeCategory, setActiveCategory] = useState(initialCategory);
   const [searchQuery, setSearchQuery] = useState(initialQuery);
 
-  // In-page stay modal state (for slideshow & booking system in a form)
-  const [selectedStay, setSelectedStay] = useState(null);
-  const [selectedDestinationForModal, setSelectedDestinationForModal] = useState(null);
-  const [isStayModalOpen, setIsStayModalOpen] = useState(false);
+  // In-page stay modal state (for slideshow & booking system)
+  const [selectedStay, setSelectedStay] = useState(matchedStayData?.stay || null);
+  const [selectedDestinationForModal, setSelectedDestinationForModal] = useState(
+    matchedStayData?.dest || null
+  );
+  const [isStayModalOpen, setIsStayModalOpen] = useState(Boolean(matchedStayData));
+
+  // Active Attraction modal state
+  const [activeAttraction, setActiveAttraction] = useState(
+    matchedAttractionData?.attraction || null
+  );
 
   // Map modal state
   const [isMapModalOpen, setIsMapModalOpen] = useState(false);
+
+  // Sync selectedValleyId when slug, stayId, or attractionId changes
+  useEffect(() => {
+    if (matchedStayData) {
+      setSelectedValleyId(matchedStayData.dest.id);
+      setSelectedStay(matchedStayData.stay);
+      setSelectedDestinationForModal(matchedStayData.dest);
+      setIsStayModalOpen(true);
+    } else if (matchedAttractionData) {
+      setSelectedValleyId(matchedAttractionData.dest.id);
+      setActiveAttraction(matchedAttractionData.attraction);
+    } else if (matchedSlugDest) {
+      setSelectedValleyId(matchedSlugDest.id);
+    } else if (!slug && !stayId && !attractionId) {
+      const qv = searchParams.get("valley") || searchParams.get("region") || searchParams.get("location");
+      setSelectedValleyId(qv ? qv.toLowerCase() : "all");
+    }
+  }, [slug, stayId, attractionId, matchedStayData, matchedAttractionData, matchedSlugDest, searchParams]);
 
   // Active Destination matching the selected valley (if not "all")
   const currentDestination = useMemo(() => {
@@ -45,64 +127,23 @@ function ExplorePage() {
       (d) =>
         d.id.toLowerCase() === selectedValleyId.toLowerCase() ||
         d.region.toLowerCase() === selectedValleyId.toLowerCase() ||
-        d.slug.toLowerCase() === selectedValleyId.toLowerCase()
+        d.slug?.toLowerCase() === selectedValleyId.toLowerCase()
     );
     return found || EXPLORE_DESTINATIONS[0];
   }, [selectedValleyId]);
-
-  // Handle URL sync
-  useEffect(() => {
-    const v = searchParams.get("valley") || searchParams.get("region") || searchParams.get("location");
-    if (v && v.toLowerCase() !== selectedValleyId.toLowerCase()) {
-      setSelectedValleyId(v.toLowerCase());
-    } else if (!v && selectedValleyId !== "all") {
-      // If no valley param, maintain "all"
-    }
-    const q = searchParams.get("q");
-    if (q !== null && q !== searchQuery) {
-      setSearchQuery(q);
-    }
-  }, [searchParams]);
-
-  // Handle initial stay parameter from URL (e.g. ?stay=101)
-  useEffect(() => {
-    if (initialStayParam) {
-      for (const dest of EXPLORE_DESTINATIONS) {
-        const stayMatch = dest.stays?.find(
-          (s) => String(s.id) === String(initialStayParam)
-        );
-        if (stayMatch) {
-          setSelectedStay(stayMatch);
-          setSelectedDestinationForModal(dest);
-          setIsStayModalOpen(true);
-          break;
-        }
-      }
-    }
-  }, [initialStayParam]);
-
-  // SEO Page Title
-  useEffect(() => {
-    if (selectedValleyId === "all" || !currentDestination) {
-      document.title = "Explore Mountain Sanctuaries & Village Stays | Pahadíly";
-    } else {
-      document.title = `${currentDestination.name} — Mountain Sanctuaries & Stays | Pahadíly`;
-    }
-  }, [selectedValleyId, currentDestination]);
 
   // Handle valley change
   const handleValleyChange = (valleyId) => {
     const targetId = valleyId ? valleyId.toLowerCase() : "all";
     setSelectedValleyId(targetId);
 
-    const newParams = new URLSearchParams(searchParams);
     if (targetId === "all") {
-      newParams.delete("valley");
+      navigate("/explore", { replace: false });
     } else {
-      newParams.set("valley", targetId);
+      const targetDest = EXPLORE_DESTINATIONS.find((d) => d.id === targetId);
+      const destSlug = targetDest?.slug || targetId;
+      navigate(`/destinations/${destSlug}`, { replace: false });
     }
-    newParams.delete("stay");
-    setSearchParams(newParams, { replace: true });
   };
 
   // Handle search query
@@ -121,7 +162,9 @@ function ExplorePage() {
       );
       if (matched) {
         setSelectedValleyId(matched.id);
-        newParams.set("valley", matched.id);
+        const destSlug = matched.slug || matched.id;
+        navigate(`/destinations/${destSlug}`, { replace: false });
+        return;
       }
     } else {
       newParams.delete("q");
@@ -149,12 +192,32 @@ function ExplorePage() {
     setSelectedStay(stay);
     setSelectedDestinationForModal(optionalDest || currentDestination || EXPLORE_DESTINATIONS[0]);
     setIsStayModalOpen(true);
+    if (stay?.id) {
+      navigate(`/stays/${stay.id}`, { replace: false });
+    }
   };
 
   const handleCloseStay = () => {
     setIsStayModalOpen(false);
     setSelectedStay(null);
     setSelectedDestinationForModal(null);
+    if (stayId) {
+      navigate(currentDestination ? `/destinations/${currentDestination.slug || currentDestination.id}` : "/explore", { replace: true });
+    }
+  };
+
+  const handleSelectAttraction = (attraction) => {
+    setActiveAttraction(attraction);
+    if (attraction?.id) {
+      navigate(`/attractions/${attraction.id}`, { replace: false });
+    }
+  };
+
+  const handleCloseAttraction = () => {
+    setActiveAttraction(null);
+    if (attractionId) {
+      navigate(currentDestination ? `/destinations/${currentDestination.slug || currentDestination.id}` : "/explore", { replace: true });
+    }
   };
 
   // Other destinations to show when browsing a single valley
@@ -163,8 +226,96 @@ function ExplorePage() {
     return EXPLORE_DESTINATIONS.filter((d) => d.id !== currentDestination.id);
   }, [currentDestination]);
 
+  // Dynamic SEO Metadata Calculation
+  let pageTitle = "Explore Mountain Sanctuaries & Offbeat Valleys in Himachal | Pahadíly";
+  let pageDescription = "Discover 8 authentic mountain sanctuaries across Kullu and Himachal Pradesh. Compare elevations, best seasons, Kath-Kuni heritage hamlets, and 32 verified stays.";
+  let canonicalPath = "/explore";
+  let ogImage = "/images/hero/himachal-hero.jpg";
+  let ogType = "website";
+
+  if (matchedStayData) {
+    const { stay, dest } = matchedStayData;
+    pageTitle = `${stay.name} in ${stay.subLocation || dest.name}, Himachal Pradesh | Pahadíly`;
+    pageDescription = `${stay.description || stay.tagline} Verified Himalayan stay in ${dest.name}. ${stay.price} ${stay.unit || "/night"}. Direct host booking with zero middleman commissions.`;
+    canonicalPath = `/stays/${stay.id}`;
+    ogImage = stay.images?.[0] || stay.image || dest.image || "/images/hero/himachal-hero.jpg";
+    ogType = "place";
+  } else if (matchedAttractionData) {
+    const { attraction, dest } = matchedAttractionData;
+    pageTitle = `Visit ${attraction.name} near ${dest.name}, Himachal Pradesh | Pahadíly`;
+    pageDescription = `${attraction.description} Distance: ${attraction.distance} from ${dest.name}. Category: ${attraction.category}. Discover nearby authentic homestays in Himachal Pradesh.`;
+    canonicalPath = `/attractions/${attraction.id}`;
+    ogImage = attraction.image || dest.image || "/images/hero/himachal-hero.jpg";
+    ogType = "place";
+  } else if (currentDestination && selectedValleyId !== "all") {
+    pageTitle = `Explore ${currentDestination.name}, Himachal Pradesh | Pahadíly`;
+    pageDescription = `${currentDestination.description.slice(0, 150)}... Elevation: ${currentDestination.elevation}. Best season: ${currentDestination.bestTime}. Discover nearby attractions and verified village homestays.`;
+    canonicalPath = `/destinations/${currentDestination.slug || currentDestination.id}`;
+    ogImage = currentDestination.images?.[0] || currentDestination.image || "/images/hero/himachal-hero.jpg";
+    ogType = "article";
+  }
+
+  // Build Structured Data Schema.org
+  const structuredData = useMemo(() => {
+    const canonicalFull = getCanonicalUrl(canonicalPath);
+
+    if (matchedStayData) {
+      const { stay, dest } = matchedStayData;
+      return [
+        generateLodgingBusinessSchema(stay, dest, canonicalFull),
+        generateBreadcrumbSchema([
+          { name: "Home", url: "/" },
+          { name: "Stays", url: "/stays" },
+          { name: dest.name, url: `/destinations/${dest.slug || dest.id}` },
+          { name: stay.name, url: `/stays/${stay.id}` },
+        ]),
+      ];
+    }
+
+    if (matchedAttractionData) {
+      const { attraction, dest } = matchedAttractionData;
+      return [
+        generateTouristAttractionSchema(attraction, dest, canonicalFull),
+        generateBreadcrumbSchema([
+          { name: "Home", url: "/" },
+          { name: "Explore", url: "/explore" },
+          { name: dest.name, url: `/destinations/${dest.slug || dest.id}` },
+          { name: attraction.name, url: `/attractions/${attraction.id}` },
+        ]),
+      ];
+    }
+
+    if (currentDestination && selectedValleyId !== "all") {
+      return [
+        generateTouristDestinationSchema(currentDestination, canonicalFull),
+        generateBreadcrumbSchema([
+          { name: "Home", url: "/" },
+          { name: "Explore", url: "/explore" },
+          { name: currentDestination.name, url: `/destinations/${currentDestination.slug || currentDestination.id}` },
+        ]),
+      ];
+    }
+
+    return [
+      generateBreadcrumbSchema([
+        { name: "Home", url: "/" },
+        { name: "Explore Sanctuaries", url: "/explore" },
+      ]),
+    ];
+  }, [matchedStayData, matchedAttractionData, currentDestination, selectedValleyId, canonicalPath]);
+
   return (
     <div className="pahadily-app">
+      {/* Dynamic SEO Tag Management */}
+      <SEO
+        title={pageTitle}
+        description={pageDescription}
+        canonicalPath={canonicalPath}
+        ogImage={ogImage}
+        ogType={ogType}
+        schema={structuredData}
+      />
+
       <Navbar activePage="explore" />
 
       <main className="explore-page-ref-layout">
@@ -203,13 +354,16 @@ function ExplorePage() {
               <div className="single-valley-deep-dive">
                 {/* Back to All Places Breadcrumb Bar */}
                 <div className="valley-nav-breadcrumbs">
-                  <button
-                    type="button"
+                  <a
+                    href="/explore"
                     className="back-to-all-btn"
-                    onClick={() => handleValleyChange("all")}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleValleyChange("all");
+                    }}
                   >
                     <span>← Back to All 8 Himalayan Places</span>
-                  </button>
+                  </a>
                   <span className="crumb-sep">/</span>
                   <span className="current-crumb">{currentDestination.name}</span>
                   <span className="crumb-badge">{currentDestination.badge}</span>
@@ -224,7 +378,9 @@ function ExplorePage() {
                 {/* Places to Explore Nearby in this valley */}
                 <PlacesNearbySection
                   destination={currentDestination}
-                  onSelectAttraction={() => {}}
+                  activeAttraction={activeAttraction}
+                  onSelectAttraction={handleSelectAttraction}
+                  onCloseAttraction={handleCloseAttraction}
                 />
 
                 {/* Stays Near This Destination with 1-click Slideshow & Booking System */}
@@ -239,33 +395,34 @@ function ExplorePage() {
                     <h3 className="more-valleys-title">
                       More Places to Explore in Himachal Pradesh
                     </h3>
-                    <button
-                      type="button"
+                    <a
+                      href="/explore"
                       className="view-all-valleys-link"
-                      onClick={() => handleValleyChange("all")}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleValleyChange("all");
+                      }}
                     >
                       <span>View All 8 Valleys</span>
                       <span className="arrow">→</span>
-                    </button>
+                    </a>
                   </div>
 
                   <div className="more-valleys-grid">
                     {otherDestinations.slice(0, 4).map((other) => {
                       const thumb = other.images?.[0] || other.image || "/images/destinations/tirthan-valley.jpg";
+                      const otherSlug = other.slug || other.id;
                       return (
-                        <div
+                        <a
                           key={other.id}
+                          href={`/destinations/${otherSlug}`}
                           className="mini-valley-card"
-                          onClick={() => handleValleyChange(other.id)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              handleValleyChange(other.id);
-                            }
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleValleyChange(other.id);
                           }}
-                          tabIndex={0}
-                          role="button"
                           aria-label={`Explore ${other.name}`}
+                          style={{ textDecoration: "none", color: "inherit" }}
                         >
                           <div className="mini-valley-img-wrap">
                             <img src={thumb} alt={other.name} loading="lazy" />
@@ -281,7 +438,7 @@ function ExplorePage() {
                               <span className="arrow">→</span>
                             </span>
                           </div>
-                        </div>
+                        </a>
                       );
                     })}
                   </div>
@@ -291,7 +448,7 @@ function ExplorePage() {
           )}
         </div>
 
-        {/* IN-PAGE STAY SLIDESHOW & BOOKING SYSTEM IN A FORM (No navigation away!) */}
+        {/* IN-PAGE STAY SLIDESHOW & BOOKING SYSTEM IN A FORM */}
         <InPageStayBookingModal
           isOpen={isStayModalOpen}
           onClose={handleCloseStay}

@@ -247,8 +247,6 @@ function FeaturedExperiences({ searchQuery = "", setSearchQuery, activeFilter = 
     return true;
   });
 
-  const isFiltering = activeFilter !== "all" || searchQuery.trim().length > 0;
-
   return (
     <section className="featured-exp-section section-container" id="browse-all">
       <div className="featured-exp-header">

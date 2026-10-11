@@ -2,21 +2,88 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Pahadíly — Rare Places. Real People. Lasting Stories</title>
-    <meta name="description" content="Discover authentic Himalayan homestays, local mountain guides, and hand-crafted community travel experiences across Himachal Pradesh." />
-    <meta property="og:title" content="Pahadíly — Rare Places. Real People. Lasting Stories" />
-    <meta property="og:description" content="Discover authentic Himalayan homestays, local mountain guides, and hand-crafted community travel experiences across Himachal Pradesh." />
+    <meta name="theme-color" content="#0a251b" />
+
+    <!-- Favicon and Brand Identity -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/images/logo/pahadily-logo.png" />
+    <link rel="canonical" href="https://pahadily.com/" />
+
+    <!-- Search Engine Titles & Descriptions -->
+    <title>Pahadíly | Discover Hidden Places & Homestays in Himachal Pradesh</title>
+    <meta
+      name="description"
+      content="Discover authentic Himalayan homestays, local mountain guides, and slow community travel experiences across Kullu, Tirthan, and offbeat Himachal Pradesh valleys."
+    />
+    <meta name="robots" content="index, follow" />
+
+    <!-- OpenGraph & Social Sharing Meta Tags -->
     <meta property="og:type" content="website" />
-    
-    <!-- Google Fonts -->
+    <meta property="og:site_name" content="Pahadíly" />
+    <meta property="og:locale" content="en_IN" />
+    <meta property="og:title" content="Pahadíly | Discover Hidden Places & Homestays in Himachal Pradesh" />
+    <meta
+      property="og:description"
+      content="Discover authentic Himalayan homestays, local mountain guides, and slow community travel experiences across Kullu, Tirthan, and offbeat Himachal Pradesh valleys."
+    />
+    <meta property="og:url" content="https://pahadily.com/" />
+    <meta property="og:image" content="https://pahadily.com/images/hero/himachal-hero.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Pahadíly - Himachal Pradesh offbeat mountain valleys and authentic homestays" />
+
+    <!-- Twitter / X Card Metadata -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Pahadíly | Discover Hidden Places & Homestays in Himachal Pradesh" />
+    <meta
+      name="twitter:description"
+      content="Discover authentic Himalayan homestays, local mountain guides, and slow community travel experiences across Kullu, Tirthan, and offbeat Himachal Pradesh valleys."
+    />
+    <meta name="twitter:image" content="https://pahadily.com/images/hero/himachal-hero.jpg" />
+
+    <!-- Google Fonts Preconnect & Stylesheets -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;0,700;0,800;1,600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
+
+    <!-- Initial Schema.org Structured Data (Pre-rendered for crawlers) -->
+    <script id="pahadily-json-ld" type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "name": "Pahadíly",
+            "alternateName": "Pahadily Travel & Community Discovery",
+            "url": "https://pahadily.com",
+            "logo": "https://pahadily.com/images/logo/pahadily-logo.png",
+            "description": "Community-first Himalayan travel platform connecting mindful travelers with authentic homestays, local guides, and slow mountain experiences.",
+            "areaServed": {
+              "@type": "AdministrativeArea",
+              "name": "Himachal Pradesh, India"
+            }
+          },
+          {
+            "@type": "WebSite",
+            "name": "Pahadíly",
+            "url": "https://pahadily.com",
+            "description": "Discover authentic Himalayan homestays, local mountain guides, and slow community travel experiences across Kullu, Tirthan, and offbeat Himachal Pradesh valleys.",
+            "potentialAction": {
+              "@type": "SearchAction",
+              "target": {
+                "@type": "EntryPoint",
+                "urlTemplate": "https://pahadily.com/explore?q={search_term_string}"
+              },
+              "query-input": "required name=search_term_string"
+            }
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

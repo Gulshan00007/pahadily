@@ -103,7 +103,16 @@ function StaysNearSection({ destination, onSelectStay }) {
 
               {/* Body */}
               <div className="stay-card-body">
-                <h3 className="stay-card-name">{stay.name}</h3>
+                <a
+                  href={`/stays/${stay.id}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    onSelectStay(stay);
+                  }}
+                  style={{ textDecoration: "none", color: "inherit" }}
+                >
+                  <h3 className="stay-card-name">{stay.name}</h3>
+                </a>
 
                 {/* Rating & Reviews */}
                 <div className="stay-card-rating-row">
@@ -141,16 +150,18 @@ function StaysNearSection({ destination, onSelectStay }) {
                 )}
 
                 {/* CTA Action Button */}
-                <button
-                  type="button"
+                <a
+                  href={`/stays/${stay.id}`}
                   className="stay-card-cta-btn"
                   onClick={(e) => {
+                    e.preventDefault();
                     e.stopPropagation();
                     onSelectStay(stay);
                   }}
+                  style={{ textDecoration: "none" }}
                 >
                   <span>View Details</span>
-                </button>
+                </a>
               </div>
             </article>
           );
