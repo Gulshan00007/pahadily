@@ -1,13 +1,24 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { submitHostApplication } from '../lib/api';
+import { submitHostApplication, getMyHostSubmissions } from '../lib/api';
 
 export default function BecomeALocalPage() {
-  const { user, showToast, triggerRefresh } = useAuth();
+  const { user, showToast, refreshKey, triggerRefresh } = useAuth();
 
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
+  const [existingSubmissions, setExistingSubmissions] = useState([]);
+
+  useEffect(() => {
+    if (user) {
+      getMyHostSubmissions()
+        .then((data) => setExistingSubmissions(data || []))
+        .catch(() => setExistingSubmissions([]));
+    } else {
+      setExistingSubmissions([]);
+    }
+  }, [user, refreshKey]);
 
   // Form state
   const [name, setName] = useState(user?.full_name || '');
@@ -334,6 +345,80 @@ export default function BecomeALocalPage() {
               boxShadow: '0 8px 30px rgba(16, 37, 29, 0.06)',
             }}
           >
+            {/* Real Application Status for Logged-In Users */}
+            {user && existingSubmissions.length > 0 && (
+              <div
+                style={{
+                  backgroundColor: '#F3EFE6',
+                  border: '1px solid rgba(16, 37, 29, 0.15)',
+                  borderRadius: '14px',
+                  padding: '18px',
+                  marginBottom: '24px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                  <h4 style={{ margin: 0, fontSize: '15px', color: '#10251D', fontWeight: 700 }}>
+                    📋 Your Application Status
+                  </h4>
+                  <span style={{ fontSize: '12px', color: '#536B5E' }}>
+                    {existingSubmissions.length} application(s)
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {existingSubmissions.map((app) => (
+                    <div
+                      key={app.id}
+                      style={{
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: '10px',
+                        padding: '12px 14px',
+                        border: '1px solid rgba(16, 37, 29, 0.08)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: '14px', color: '#10251D' }}>
+                            {app.property_name || app.name} ({app.skill})
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#536B5E', marginTop: '2px' }}>
+                            Region: {app.region} • Submitted {new Date(app.created_at).toLocaleDateString()}
+                          </div>
+                        </div>
+                        <span
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            padding: '3px 10px',
+                            borderRadius: '9999px',
+                            textTransform: 'uppercase',
+                            backgroundColor:
+                              app.status === 'approved'
+                                ? '#dcfce7'
+                                : app.status === 'rejected'
+                                ? '#fee2e2'
+                                : '#fef3c7',
+                            color:
+                              app.status === 'approved'
+                                ? '#15803d'
+                                : app.status === 'rejected'
+                                ? '#b91c1c'
+                                : '#b45309',
+                          }}
+                        >
+                          {app.status === 'approved' ? '✓ Approved' : app.status === 'rejected' ? '✕ Declined' : '⏳ Under Review'}
+                        </span>
+                      </div>
+                      {app.admin_notes && (
+                        <div style={{ fontSize: '12px', color: '#334155', backgroundColor: '#f8fafc', padding: '6px 10px', borderRadius: '6px', marginTop: '8px' }}>
+                          <strong>Administrator Feedback:</strong> {app.admin_notes}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {submitted ? (
               <div style={{ textAlign: 'center', padding: '40px 20px' }}>
                 <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎉</div>

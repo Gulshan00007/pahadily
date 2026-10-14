@@ -51,8 +51,25 @@
   --shadow-md: 0 8px 24px rgba(10, 37, 27, 0.08);
   --shadow-search: 0 10px 30px rgba(6, 25, 18, 0.18);
   
-  --transition-fast: 0.18s ease;
-  --transition-smooth: 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-fast: 0.14s ease;
+  --transition-smooth: 0.16s ease;
+  --transition-instant: 0.12s ease;
+  --transition-max: 0.18s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0s !important;
+    transition: none !important;
+    transition-duration: 0.001ms !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -238,7 +255,7 @@ button {
   border-radius: var(--radius-pill);
   cursor: pointer;
   letter-spacing: -0.01em;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.16s ease-out;
 }
 
 .login-button:hover {
@@ -262,7 +279,7 @@ button {
   border-radius: var(--radius-pill);
   cursor: pointer;
   letter-spacing: -0.01em;
-  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.16s ease-out;
   box-shadow: 0 2px 10px rgba(22, 63, 46, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
@@ -619,7 +636,7 @@ button {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.16s ease;
 }
 
 .destination-card:hover .destination-img {
@@ -841,7 +858,7 @@ button {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.16s ease;
 }
 
 .editorial-dest-card:hover .editorial-dest-img {
@@ -1825,7 +1842,7 @@ button {
   border-radius: 50%;
   background: #22c55e;
   box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
-  animation: greenPulse 2s infinite;
+  animation: none;
 }
 
 @keyframes greenPulse {
@@ -1955,7 +1972,7 @@ button {
     border-bottom: 1px solid var(--color-border-card);
     box-shadow: 0 12px 28px rgba(10, 37, 27, 0.1);
     gap: 14px;
-    animation: fadeInMenu 0.22s ease-out;
+    animation: fadeInMenu 0.15s ease-out;
   }
 
   @keyframes fadeInMenu {
@@ -2669,7 +2686,7 @@ button {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transition: transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.14s ease;
   position: relative;
 }
 
@@ -2696,7 +2713,7 @@ button {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.16s ease;
 }
 
 .ep-stay-card:hover .ep-stay-img {
@@ -3562,7 +3579,7 @@ button {
   height: 215px;
   background: linear-gradient(90deg, #e9f0ec 25%, #f4f8f5 50%, #e9f0ec 75%);
   background-size: 200% 100%;
-  animation: epShimmer 1.5s infinite;
+  animation: none;
 }
 
 .ep-skeleton-body {
@@ -3771,7 +3788,7 @@ button {
   height: 30px;
   border-radius: 50%;
   background: rgba(37, 99, 235, 0.35);
-  animation: epUserPulse 2s infinite;
+  animation: none;
 }
 
 @keyframes epUserPulse {
@@ -3803,7 +3820,7 @@ button {
   box-shadow: 0 8px 24px rgba(8, 28, 19, 0.25);
   z-index: 30;
   border: 1px solid #d1dfd6;
-  animation: epSlideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: epSlideUp 0.16s ease-out;
 }
 
 @keyframes epSlideUp {
@@ -4154,7 +4171,7 @@ button {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.16s ease;
 }
 
 .exp-card:hover .exp-card-img {
@@ -5038,7 +5055,7 @@ button {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.16s ease;
 }
 
 .local-card:hover .local-card-img {
@@ -5346,7 +5363,7 @@ button {
   border-radius: 50%;
   background-color: #27ae60;
   box-shadow: 0 0 0 2px rgba(39, 174, 96, 0.25);
-  animation: pulse 2s infinite;
+  animation: none;
 }
 
 @keyframes pulse {
@@ -5555,7 +5572,7 @@ button {
   align-items: center;
   justify-content: center;
   padding: 20px;
-  animation: modalFadeIn 0.25s ease-out;
+  animation: modalFadeIn 0.16s ease-out;
 }
 
 @keyframes modalFadeIn {
@@ -5572,7 +5589,7 @@ button {
   border-radius: var(--radius-lg);
   overflow-y: auto;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
-  animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: modalSlideUp 0.18s ease-out;
 }
 
 @keyframes modalSlideUp {
@@ -6349,7 +6366,7 @@ button {
   background: #2ecc71;
   border-radius: 50%;
   box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.3);
-  animation: pulse 2s infinite;
+  animation: none;
 }
 
 @keyframes pulse {
@@ -6454,7 +6471,7 @@ button {
   align-items: flex-start;
   gap: 16px;
   box-shadow: 0 2px 12px rgba(12, 34, 24, 0.04);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.14s ease;
 }
 
 .kpi-card:hover {
@@ -6817,7 +6834,7 @@ button {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -7066,7 +7083,7 @@ button {
   border: 1px solid #d4a359;
   text-decoration: none;
   box-shadow: 0 3px 10px rgba(27, 73, 51, 0.25);
-  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.14s ease;
 }
 
 .nav-book-stay-cta:hover {
@@ -7078,7 +7095,7 @@ button {
 
 .nav-book-stay-cta .cta-sparkle {
   font-size: 12px;
-  animation: pulse-badge 2s infinite ease-in-out;
+  animation: none;
 }
 
 
@@ -7146,7 +7163,7 @@ button {
 .bcrumb-link {
   color: rgba(255,255,255,0.5);
   text-decoration: none;
-  transition: color 0.2s;
+  transition: color 0.15s ease;
 }
 .bcrumb-link:hover { color: #6ee7a0; }
 .bcrumb-sep { color: rgba(255,255,255,0.3); }
@@ -7226,7 +7243,7 @@ button {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.16s ease;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
@@ -7282,7 +7299,7 @@ button {
   padding: 11px 16px;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  transition: border-color 0.2s, background 0.2s;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 .book-search-box:focus-within {
   border-color: rgba(110,231,160,0.4);
@@ -7309,7 +7326,7 @@ button {
   cursor: pointer;
   font-size: 14px;
   padding: 0;
-  transition: color 0.2s;
+  transition: color 0.15s ease;
 }
 .book-clear-btn:hover { color: #6ee7a0; }
 
@@ -7334,7 +7351,7 @@ button {
   cursor: pointer;
   backdrop-filter: blur(12px);
   outline: none;
-  transition: border-color 0.2s;
+  transition: border-color 0.15s ease;
 }
 .book-select:focus { border-color: rgba(110,231,160,0.4); }
 .book-select option { background: #0c1f14; color: #e8f5ee; }
@@ -7369,7 +7386,7 @@ button {
   border-radius: 40px;
   padding: 7px 15px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.16s ease;
   backdrop-filter: blur(8px);
 }
 .valley-pill-btn:hover {
@@ -7428,7 +7445,7 @@ button {
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 20px;
   overflow: hidden;
-  transition: transform 0.25s, box-shadow 0.25s, border-color 0.25s;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.14s ease;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
@@ -7448,7 +7465,7 @@ button {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.5s ease;
+  transition: transform 0.16s ease;
 }
 .book-stay-card:hover .card-media-img {
   transform: scale(1.05);
@@ -7608,7 +7625,7 @@ button {
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.16s ease;
   white-space: nowrap;
   box-shadow: 0 4px 16px rgba(34,197,94,0.3);
 }
@@ -7637,7 +7654,7 @@ button {
   font-size: 13.5px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.16s ease;
 }
 .btn-reset-filters:hover {
   background: rgba(110,231,160,0.18);
@@ -7690,7 +7707,7 @@ button {
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.16s ease;
   backdrop-filter: blur(8px);
 }
 .btn-apply-host:hover {
@@ -7714,7 +7731,7 @@ button {
   align-items: center;
   justify-content: center;
   padding: 20px;
-  animation: ns-fade-in 0.22s ease;
+  animation: ns-fade-in 0.15s ease-out;
 }
 
 @keyframes ns-fade-in {
@@ -7732,7 +7749,7 @@ button {
   overflow: hidden;
   border: 1px solid rgba(255,255,255,0.09);
   box-shadow: 0 40px 100px rgba(0,0,0,0.6), 0 0 0 1px rgba(110,231,160,0.06);
-  animation: ns-slide-up 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: ns-slide-up 0.16s ease-out;
 }
 
 @keyframes ns-slide-up {
@@ -7756,7 +7773,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: all 0.16s ease;
   backdrop-filter: blur(8px);
 }
 .ns-close-btn:hover {
@@ -7775,7 +7792,7 @@ button {
   inset: 0;
   background-size: cover;
   background-position: center;
-  animation: ns-zoom-in 8s ease-in-out infinite alternate;
+  animation: none;
 }
 @keyframes ns-zoom-in {
   from { transform: scale(1); }
@@ -7901,7 +7918,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: all 0.16s ease;
   backdrop-filter: blur(8px);
 }
 .ns-nav-btn:hover {
@@ -7918,7 +7935,7 @@ button {
   border: none;
   cursor: pointer;
   padding: 0;
-  transition: all 0.25s;
+  transition: all 0.16s ease;
 }
 .ns-dot.active {
   background: #6ee7a0;
@@ -7999,7 +8016,7 @@ button {
   padding: 14px;
   cursor: pointer;
   user-select: none;
-  transition: all 0.2s;
+  transition: all 0.16s ease;
 }
 .ns-option-card:hover {
   background: rgba(255,255,255,0.07);
@@ -8029,7 +8046,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: all 0.16s ease-out;
   color: transparent;
 }
 .ns-option-check.checked {
@@ -8130,7 +8147,7 @@ button {
   font-size: 14.5px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.22s;
+  transition: all 0.16s ease;
   letter-spacing: 0.2px;
   box-shadow: 0 6px 20px rgba(34,197,94,0.3);
 }
@@ -8171,7 +8188,7 @@ button {
 /* --- Travel Location Card Styling --- */
 .ep-location-card {
   cursor: pointer;
-  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.14s ease;
   position: relative;
 }
 
@@ -8212,7 +8229,7 @@ button {
   gap: 6px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
   z-index: 5;
-  animation: epFadeIn 0.2s ease-out;
+  animation: epFadeIn 0.16s ease-out;
 }
 
 @keyframes epFadeIn {
@@ -8271,7 +8288,7 @@ button {
   font-size: 12.5px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
   box-shadow: 0 2px 8px rgba(27, 67, 50, 0.2);
 }
 
@@ -8300,7 +8317,7 @@ button {
   box-shadow: 0 16px 48px rgba(16, 42, 30, 0.08);
   position: relative;
   overflow: hidden;
-  animation: epSlideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: epSlideDown 0.16s ease-out;
 }
 
 @keyframes epSlideDown {
@@ -8359,7 +8376,7 @@ button {
   border-radius: 9999px;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
 }
 
 .ep-expansion-close-btn:hover {
@@ -8385,7 +8402,7 @@ button {
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
 }
 
 .ep-exp-tab-btn:hover {
@@ -8414,7 +8431,7 @@ button {
   padding: 20px;
   display: flex;
   flex-direction: column;
-  transition: all 0.22s ease;
+  transition: all 0.16s ease;
 }
 
 .ep-homestay-card:hover {
@@ -8499,7 +8516,7 @@ button {
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
   box-shadow: 0 3px 10px rgba(27, 67, 50, 0.2);
 }
 
@@ -8538,7 +8555,7 @@ button {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  transition: all 0.22s ease;
+  transition: all 0.16s ease;
 }
 
 .ep-sub-exp-card:hover {
@@ -8620,7 +8637,7 @@ button {
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
 }
 
 .ep-sub-exp-btn:hover {
@@ -8758,7 +8775,7 @@ button {
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
 }
 
 .ep-sub-guide-btn:hover {
@@ -8966,7 +8983,7 @@ button {
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
   flex-shrink: 0;
   box-shadow: 0 4px 12px rgba(27, 67, 50, 0.25);
 }
@@ -8997,7 +9014,7 @@ button {
   background: rgba(255, 255, 255, 0.16);
   border: 1px solid rgba(255, 255, 255, 0.25);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
   backdrop-filter: blur(8px);
 }
 
@@ -9069,7 +9086,7 @@ button {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.4s ease;
+  transition: transform 0.16s ease;
 }
 
 .dest-img-gradient-overlay {
@@ -9122,7 +9139,7 @@ button {
   color: #17382b;
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
   z-index: 3;
 }
 
@@ -9146,7 +9163,7 @@ button {
   color: #17382b;
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
   z-index: 3;
 }
 
@@ -9242,7 +9259,7 @@ button {
   justify-content: center;
   color: #5d7367;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
 }
 
 .dest-wishlist-btn:hover {
@@ -9388,7 +9405,7 @@ button {
   font-weight: 700;
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(27, 67, 50, 0.25);
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
 }
 
 .mini-map-view-btn:hover {
@@ -9484,7 +9501,7 @@ button {
   display: flex;
   flex-direction: column;
   cursor: pointer;
-  transition: all 0.22s ease;
+  transition: all 0.16s ease;
 }
 
 .attraction-card:hover {
@@ -9505,7 +9522,7 @@ button {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.4s ease;
+  transition: transform 0.16s ease;
 }
 
 .attraction-card:hover .attraction-img {
@@ -9630,7 +9647,7 @@ button {
   display: flex;
   flex-direction: column;
   cursor: pointer;
-  transition: all 0.22s ease;
+  transition: all 0.16s ease;
 }
 
 .stay-card-ref:hover {
@@ -9651,7 +9668,7 @@ button {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.4s ease;
+  transition: transform 0.16s ease;
 }
 
 .stay-card-ref:hover .stay-card-img {
@@ -9683,7 +9700,7 @@ button {
   justify-content: center;
   cursor: pointer;
   backdrop-filter: blur(6px);
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
   z-index: 3;
 }
 
@@ -9799,7 +9816,7 @@ button {
   font-weight: 700;
   cursor: pointer;
   margin-top: auto;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
 }
 
 .stay-card-cta-btn:hover {
@@ -9821,7 +9838,7 @@ button {
   align-items: center;
   justify-content: center;
   padding: 20px;
-  animation: fadeIn 0.2s ease;
+  animation: fadeIn 0.16s ease-out;
 }
 
 .stay-book-modal-card {
@@ -9850,7 +9867,7 @@ button {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
   z-index: 20;
 }
 
@@ -9887,7 +9904,7 @@ button {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  animation: fadeIn 0.25s ease-out;
+  animation: fadeIn 0.16s ease-out;
 }
 
 .stay-slideshow-overlay {
@@ -9942,7 +9959,7 @@ button {
   color: #17382b;
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
   z-index: 3;
 }
 
@@ -10377,7 +10394,7 @@ button {
   font-size: 14.5px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
   box-shadow: 0 4px 16px rgba(27, 67, 50, 0.25);
   margin-top: 4px;
 }
@@ -10498,7 +10515,7 @@ button {
   font-size: 13.5px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
 }
 
 .stay-book-action-btn.primary:hover {
@@ -10566,7 +10583,7 @@ button {
   padding: 6px 14px;
   border-radius: 9999px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
 }
 
 .map-modal-close-btn:hover {
@@ -10778,7 +10795,7 @@ button {
   align-items: center;
   justify-content: center;
   padding: 20px;
-  animation: sbmFadeIn 0.24s ease-out;
+  animation: sbmFadeIn 0.16s ease-out;
 }
 
 @keyframes sbmFadeIn {
@@ -10816,7 +10833,7 @@ button {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: all 0.16s ease-out;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
 }
 
@@ -10845,7 +10862,7 @@ button {
   inset: 0;
   background-size: cover;
   background-position: center;
-  transition: opacity 0.4s ease-in-out, transform 0.6s ease;
+  transition: opacity 0.16s ease, transform 0.16s ease;
   transform: scale(1.02);
 }
 
@@ -10969,7 +10986,7 @@ button {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.16s ease;
   backdrop-filter: blur(6px);
 }
 
@@ -10993,7 +11010,7 @@ button {
   border: none;
   cursor: pointer;
   padding: 0;
-  transition: all 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: all 0.16s ease-out;
 }
 
 .sbm-dot.active {
@@ -11142,7 +11159,7 @@ button {
   display: flex;
   gap: 12px;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: all 0.16s ease-out;
 }
 
 .sbm-option-card:hover {
@@ -11167,7 +11184,7 @@ button {
   justify-content: center;
   flex-shrink: 0;
   margin-top: 2px;
-  transition: border-color 0.2s;
+  transition: border-color 0.15s ease;
 }
 
 .sbm-option-card.selected .sbm-option-radio-dot {
@@ -11268,7 +11285,7 @@ button {
   font-size: 13px;
   color: #ffffff;
   outline: none;
-  transition: all 0.2s;
+  transition: all 0.16s ease;
   font-family: inherit;
 }
 
@@ -11324,7 +11341,7 @@ button {
   font-size: 12px;
   color: rgba(255, 255, 255, 0.85);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.16s ease;
 }
 
 .sbm-pay-pill input {
@@ -11411,7 +11428,7 @@ button {
   gap: 10px;
   cursor: pointer;
   box-shadow: 0 6px 20px rgba(31, 101, 69, 0.4);
-  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: all 0.16s ease-out;
 }
 
 .sbm-submit-btn:hover:not(:disabled) {
@@ -11567,7 +11584,7 @@ button {
   font-size: 13.5px;
   font-weight: 800;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.16s ease;
 }
 
 .sbm-btn-view-bookings:hover {
@@ -11585,7 +11602,7 @@ button {
   font-size: 13.5px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.16s ease;
 }
 
 .sbm-btn-done:hover {
@@ -11601,7 +11618,7 @@ button {
   border-color: rgba(120, 202, 160, 0.4) !important;
   color: #0f2e22 !important;
   font-weight: 700 !important;
-  transition: all 0.2s;
+  transition: all 0.16s ease;
 }
 
 .ep-loc-stat-clickable:hover {
@@ -11620,7 +11637,7 @@ button {
   font-size: 12.5px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.16s ease;
 }
 
 .ep-location-quick-book-btn:hover {
@@ -11638,7 +11655,7 @@ button {
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.16s ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -11750,7 +11767,7 @@ button {
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   z-index: 5;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
   flex-shrink: 0;
 }
 
@@ -11784,7 +11801,7 @@ button {
   border: 1.5px solid #dce8e1;
   border-radius: 12px;
   cursor: pointer;
-  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.16s ease-out;
   flex-shrink: 0;
   text-align: left;
 }
@@ -11950,7 +11967,7 @@ button {
   border: none;
   cursor: pointer;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -12037,9 +12054,7 @@ button {
   display: flex;
   flex-direction: column;
   height: 100%;
-  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1),
-              box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1),
-              border-color 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.14s ease;
 }
 
 .all-dest-card:hover {
@@ -12063,7 +12078,7 @@ button {
   object-fit: cover;
   object-position: center;
   display: block;
-  transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.16s ease;
 }
 
 .all-dest-card:hover .all-dest-card-img {
@@ -12389,7 +12404,7 @@ button {
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.16s ease-out;
   height: 44px;
   font-family: inherit;
   box-shadow: 0 2px 8px rgba(21, 62, 44, 0.18);
@@ -12420,7 +12435,7 @@ button {
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.16s ease-out;
   height: 44px;
   font-family: inherit;
 }
@@ -12455,7 +12470,7 @@ button {
   display: flex;
   align-items: center;
   gap: 6px;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
 }
 
 .back-to-all-btn:hover {
@@ -12534,7 +12549,7 @@ button {
   border-radius: 16px;
   overflow: hidden;
   cursor: pointer;
-  transition: all 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.16s ease-out;
   display: flex;
   flex-direction: column;
 }
@@ -12558,7 +12573,7 @@ button {
   height: 100%;
   object-fit: cover;
   object-position: center;
-  transition: transform 0.6s ease;
+  transition: transform 0.16s ease;
 }
 
 .mini-valley-card:hover .mini-valley-img-wrap img {
@@ -12636,7 +12651,7 @@ button {
   font-size: 12px;
   font-weight: 700;
   color: #2b7050;
-  transition: gap 0.2s ease;
+  transition: gap 0.15s ease;
 }
 
 .mini-valley-card:hover .mini-explore-cta {
@@ -12877,7 +12892,7 @@ button {
   border-radius: 50%;
   background: #1e5b3a;
   box-shadow: 0 0 0 0 rgba(30, 91, 58, 0.6);
-  animation: radarPulseAnim 1.8s infinite;
+  animation: none;
 }
 
 @keyframes radarPulseAnim {
@@ -13008,7 +13023,7 @@ button {
   align-items: center;
   cursor: pointer;
   z-index: 12;
-  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), z-index 0.1s;
+  transition: transform 0.16s ease, z-index 0.12s ease;
 }
 
 .himalaya-map-pin:hover,
@@ -13047,7 +13062,7 @@ button {
   height: 58px;
   border-radius: 50%;
   background: var(--pin-glow, rgba(27, 77, 62, 0.4));
-  animation: pinPulseWaveAnim 2s infinite;
+  animation: none;
   pointer-events: none;
 }
 
@@ -13125,7 +13140,7 @@ button {
   height: 30px;
   border-radius: 50%;
   background: rgba(37, 99, 235, 0.4);
-  animation: userPingAnim 2s infinite;
+  animation: none;
 }
 
 @keyframes userPingAnim {
@@ -13160,7 +13175,7 @@ button {
   box-shadow: 0 18px 45px rgba(10, 37, 27, 0.26);
   z-index: 35;
   padding: 16px;
-  animation: mapCardSlideUpAnim 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: mapCardSlideUpAnim 0.16s ease-out;
 }
 
 @keyframes mapCardSlideUpAnim {

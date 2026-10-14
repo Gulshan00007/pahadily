@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { getStats, getHostApplications, updateHostApplicationStatus, getBookings } from '../lib/api';
 
 export default function AdminPortalPage() {
-  const { user, isAdmin, demoLogin, showToast, refreshKey, triggerRefresh } = useAuth();
+  const { user, isAdmin, showToast, refreshKey, triggerRefresh } = useAuth();
   const [stats, setStats] = useState(null);
   const [applications, setApplications] = useState([]);
   const [allBookings, setAllBookings] = useState([]);
@@ -68,6 +68,25 @@ export default function AdminPortalPage() {
     }
   };
 
+  if (!user || !isAdmin) {
+    return (
+      <div style={{ backgroundColor: '#F7F5EE', minHeight: 'calc(100vh - 76px)', padding: '60px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ maxWidth: '500px', width: '100%', backgroundColor: '#FFFFFF', borderRadius: '20px', padding: '36px', textAlign: 'center', border: '1px solid rgba(16, 37, 29, 0.1)', boxShadow: '0 8px 30px rgba(16, 37, 29, 0.06)' }}>
+          <div style={{ fontSize: '42px', marginBottom: '14px' }}>🏔️</div>
+          <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: '24px', color: '#10251D', marginBottom: '10px' }}>
+            Administrator Access Required
+          </h2>
+          <p style={{ fontSize: '14.5px', color: '#536B5E', lineHeight: 1.55, marginBottom: '24px' }}>
+            The Pahadíly Operations Console is restricted to authorized platform administrators. Please sign in with an administrator account to view marketplace metrics and review host applications.
+          </p>
+          <a href="/" style={{ padding: '10px 22px', borderRadius: '9999px', backgroundColor: '#174D39', color: '#FFFFFF', fontSize: '13.5px', fontWeight: 700, textDecoration: 'none' }}>
+            Return to Homepage
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ backgroundColor: '#F7F5EE', minHeight: 'calc(100vh - 76px)', paddingBottom: '80px' }}>
       {/* Header Banner */}
@@ -85,25 +104,6 @@ export default function AdminPortalPage() {
                 Manage local provider vetting, platform throughput, and operational bookings.
               </p>
             </div>
-
-            {!isAdmin && (
-              <button
-                type="button"
-                onClick={() => demoLogin('admin')}
-                style={{
-                  padding: '8px 18px',
-                  borderRadius: '9999px',
-                  backgroundColor: '#8EE49A',
-                  color: '#10251D',
-                  fontSize: '13px',
-                  fontWeight: 700,
-                  border: 'none',
-                  cursor: 'pointer',
-                }}
-              >
-                ⚡ Switch to Demo Administrator
-              </button>
-            )}
           </div>
         </div>
       </section>

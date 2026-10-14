@@ -16,7 +16,7 @@
   padding: 5px 12px 5px 6px;
   border-radius: 9999px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
@@ -72,7 +72,7 @@
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
   padding: 8px;
   z-index: 1000;
-  animation: fadeInDown 0.2s ease;
+  animation: fadeInDown 0.16s ease-out;
 }
 
 .user-dropdown-header {
@@ -155,13 +155,13 @@
   letter-spacing: -0.01em;
   border-radius: 9999px;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.16s ease;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
 }
 
 .my-bookings-nav-btn svg {
   color: #2d6a4f;
-  transition: transform 0.2s ease;
+  transition: transform 0.16s ease;
 }
 
 .my-bookings-nav-btn:hover {
@@ -187,7 +187,7 @@
   border: 1px solid rgba(217, 119, 6, 0.3) !important;
   padding: 6px 14px !important;
   border-radius: 9999px !important;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  transition: all 0.16s ease !important;
   box-shadow: 0 1px 4px rgba(217, 119, 6, 0.08) !important;
 }
 
@@ -211,7 +211,7 @@
   align-items: center;
   justify-content: center;
   padding: 16px;
-  animation: modalFadeIn 0.25s ease;
+  animation: modalFadeIn 0.15s ease-out;
 }
 
 @keyframes modalFadeIn {
@@ -220,8 +220,8 @@
 }
 
 @keyframes fadeInDown {
-  from { opacity: 0; transform: translateY(-8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* --- Auth Modal Card --- */
@@ -252,7 +252,7 @@
   justify-content: center;
   color: #64748b;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
 }
 
 .auth-modal-close:hover {
@@ -313,7 +313,7 @@
   font-weight: 600;
   color: #64748b;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
 }
 
 .auth-tab-btn.active {
@@ -418,7 +418,7 @@
   font-size: 0.9rem;
   color: #1e293b;
   background: #ffffff;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
   box-sizing: border-box;
 }
 
@@ -447,7 +447,7 @@
   font-weight: 600;
   color: #475569;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
 }
 
 .role-pill-label.selected {
@@ -475,7 +475,7 @@
   font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
   margin-top: 6px;
   box-shadow: 0 4px 14px rgba(27, 67, 50, 0.25);
 }
@@ -565,7 +565,7 @@
   justify-content: center;
   color: #64748b;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
   z-index: 10;
 }
 
@@ -786,7 +786,7 @@
   font-weight: 600;
   font-size: 0.9rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
 }
 
 .btn-view-bookings:hover {
@@ -803,7 +803,7 @@
   font-weight: 600;
   font-size: 0.9rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
 }
 
 /* --- My Bookings Modal / Drawer --- */
@@ -856,7 +856,7 @@
   border: 1px solid #e2e8f0;
   border-radius: 16px;
   padding: 14px;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
 }
 
 .booking-trip-card:hover {
@@ -991,7 +991,7 @@
   gap: 12px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
   z-index: 10000;
-  animation: toastSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: toastFade 0.16s ease-out;
   border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
@@ -1003,9 +1003,9 @@
   background: #1e3a8a;
 }
 
-@keyframes toastSlideUp {
-  from { transform: translateY(100%); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+@keyframes toastFade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* --- Admin Access Gate --- */
@@ -1160,7 +1160,7 @@
   font-weight: 600;
   color: #475569;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
   white-space: nowrap;
 }
 
@@ -1253,7 +1253,7 @@
   font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
 }
 
 .btn-admin-submit:hover {
@@ -1494,7 +1494,7 @@
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
 }
 
 .ep-card-book-btn:hover {
@@ -1548,7 +1548,7 @@
   font-weight: 600;
   letter-spacing: -0.01em;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.16s ease;
   box-shadow: 0 2px 8px rgba(27, 67, 50, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
@@ -1637,7 +1637,7 @@
   font-weight: 600;
   color: #3b5245;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
 }
 
 .host-nav-pill:hover {
@@ -1753,7 +1753,7 @@
   font-size: 0.9rem;
   color: #1f2937;
   background: #fbfdfc;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
   font-family: inherit;
 }
 
@@ -1847,7 +1847,7 @@
   padding: 10px;
   border-radius: 10px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
   margin-top: 6px;
 }
 
@@ -1871,7 +1871,7 @@
   font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.16s ease;
   box-shadow: 0 4px 18px rgba(27, 67, 50, 0.3);
 }
 
@@ -2658,7 +2658,7 @@
   font-size: 0.88rem;
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(27, 67, 50, 0.25);
-  transition: all 0.2s ease;
+  transition: all 0.16s ease;
 }
 
 .btn-modal-approve-publish:hover {
@@ -2702,7 +2702,7 @@
   font-size: 0.85rem;
   font-weight: 600;
   color: #3b5245;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.16s ease;
 }
 
 .role-pill-label input[type="radio"] {
@@ -2828,6 +2828,26 @@
 .btn-text-sub:hover {
   color: #143527;
   text-decoration: underline;
+}
+
+/* ==========================================================================
+   MOTION RESTRAINT & ACCESSIBILITY
+   Calm, natural, professional styling with fast subtle transitions (120-180ms)
+   ========================================================================== */
+*, *::before, *::after {
+  /* Restrict transition times to calm 120-180ms */
+  transition-duration: 0.16s !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 

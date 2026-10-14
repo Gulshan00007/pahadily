@@ -5,8 +5,11 @@ import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import pg from "pg";
+import nodemailer from "nodemailer";
 import { EXPLORE_DESTINATIONS } from "./src/data/exploreDestinationsData.js";
 
+const { Pool } = pg;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -17,23 +20,24 @@ function getArg(flag: string): string | undefined {
 
 const PORT = Number(getArg("--port") || process.env.PORT) || 3000;
 const HOST = getArg("--host") || "0.0.0.0";
-const SECRET_KEY = process.env.JWT_SECRET || "pahadily_secret_mountain_key_2026_super_secure";
+const IS_PROD = process.env.NODE_ENV === "production";
 
-// Prevent WebSocket or non-fatal address collisions from killing dev server
-process.on("uncaughtException", (err: any) => {
-  if (err?.message?.includes("WebSocket") || err?.code === "EADDRINUSE") {
-    console.warn("Ignored non-fatal server warning:", err.message);
-    return;
+// --- Secret Key Validation ---
+const DEFAULT_DEV_SECRET = "pahadily_dev_secret_key_mountain_2026_secure_fallback";
+let SECRET_KEY = process.env.JWT_SECRET || DEFAULT_DEV_SECRET;
+
+if (IS_PROD) {
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET === DEFAULT_DEV_SECRET || process.env.JWT_SECRET.length < 32) {
+    console.error("FATAL: In production mode, a strong JWT_SECRET environment variable of at least 32 characters is strictly required.");
+    // In production, refuse to run with insecure secret
+    if (process.env.ENFORCE_PROD_SECURITY !== "false") {
+      process.exit(1);
+    }
   }
-  console.error("Uncaught exception:", err);
-});
-
-process.on("unhandledRejection", (reason) => {
-  console.warn("Unhandled promise rejection:", reason);
-});
+}
 
 // --- Types ---
-interface User {
+export interface User {
   id: number;
   email: string;
   password_hash: string;
@@ -48,11 +52,12 @@ interface User {
   created_at: string;
 }
 
-interface Place {
+export interface Place {
   id: number;
   name: string;
   tagline: string;
   region: string;
+  district?: string;
   category: string;
   price: string;
   unit: string;
@@ -70,7 +75,7 @@ interface Place {
   created_at: string;
 }
 
-interface PlaceReview {
+export interface PlaceReview {
   id: number;
   place_id: number;
   user_name: string;
@@ -79,7 +84,7 @@ interface PlaceReview {
   created_at: string;
 }
 
-interface Experience {
+export interface Experience {
   id: number;
   title: string;
   region: string;
@@ -98,7 +103,7 @@ interface Experience {
   created_at: string;
 }
 
-interface Local {
+export interface Local {
   id: number;
   category: string;
   region: string;
@@ -123,7 +128,7 @@ interface Local {
   created_at: string;
 }
 
-interface Booking {
+export interface Booking {
   id: number;
   booking_type: string;
   item_id: number;
@@ -153,7 +158,7 @@ interface Booking {
   created_at: string;
 }
 
-interface HostApplication {
+export interface HostApplication {
   id: number;
   name: string;
   email?: string | null;
@@ -183,32 +188,22 @@ interface HostApplication {
   created_at: string;
 }
 
-interface EmailNotification {
+export interface EmailNotification {
   id: number;
   recipient_email: string;
   recipient_name: string;
   subject: string;
   email_type: string;
   booking_id?: number | null;
-  status: string;
+  status: "sent" | "failed" | "unavailable";
   preview: string;
   created_at: string;
 }
 
-interface RegistrationOtp {
-  id: number;
-  email: string;
-  otp_code: string;
-  full_name: string;
-  phone?: string | null;
-  role: "traveler" | "host" | "admin";
-  password_hash: string;
-  salt: string;
-  is_used: boolean;
-  created_at: string;
-}
+// --- Storage Engine State & Dual-Mode Configuration ---
+export let activeStorageType: "postgres" | "local_json" = "local_json";
+let pgPool: pg.Pool | null = null;
 
-// --- In-Memory Stores ---
 const users = new Map<number, User>();
 const places = new Map<number, Place>();
 const placeReviews = new Map<number, PlaceReview>();
@@ -217,7 +212,6 @@ const locals = new Map<number, Local>();
 const bookings = new Map<number, Booking>();
 const hostApplications = new Map<number, HostApplication>();
 const emailNotifications: EmailNotification[] = [];
-const registrationOtps: RegistrationOtp[] = [];
 
 let nextUserId = 1;
 let nextPlaceId = 1;
@@ -227,74 +221,76 @@ let nextLocalId = 1;
 let nextBookingId = 1001;
 let nextHostAppId = 1;
 let nextNotificationId = 1;
-let nextOtpId = 1;
 
-// --- Crypto & Password Helpers ---
-function hashPassword(password: string, salt?: string): { hash: string; salt: string } {
-  const actualSalt = salt || crypto.randomBytes(16).toString("hex");
-  const derivedKey = crypto.pbkdf2Sync(password, actualSalt, 100000, 32, "sha256");
-  return { hash: derivedKey.toString("hex"), salt: actualSalt };
-}
+// --- JSON Disk Persistence Path ---
+const DB_FILE = path.resolve(__dirname, "data", "pahadily_db_state.json");
 
-function verifyPassword(password: string, salt: string, expectedHash: string): boolean {
-  const { hash } = hashPassword(password, salt);
-  return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(expectedHash));
-}
-
-function createToken(user: User): string {
-  const payload = {
-    sub: user.id,
-    email: user.email,
-    role: user.role,
-    name: user.full_name,
-    exp: Math.floor(Date.now() / 1000) + 86400 * 30, // 30 days
-    nonce: crypto.randomBytes(8).toString("hex"),
-  };
-  const payloadRaw = Buffer.from(JSON.stringify(payload)).toString("hex");
-  const signature = crypto.createHmac("sha256", SECRET_KEY).update(payloadRaw).digest("hex");
-  return `${payloadRaw}.${signature}`;
-}
-
-function decodeToken(token: string): any | null {
+function saveDbState() {
+  if (activeStorageType === "postgres") return; // PostgreSQL handles persistence
   try {
-    if (!token || !token.includes(".")) return null;
-    const [payloadHex, signature] = token.split(".");
-    const expectedSig = crypto.createHmac("sha256", SECRET_KEY).update(payloadHex).digest("hex");
-    if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSig))) {
-      return null;
+    const dir = path.dirname(DB_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
     }
-    const payloadStr = Buffer.from(payloadHex, "hex").toString("utf-8");
-    const payload = JSON.parse(payloadStr);
-    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
-      return null;
-    }
-    return payload;
-  } catch {
-    return null;
+    const state = {
+      users: Array.from(users.entries()),
+      places: Array.from(places.entries()),
+      placeReviews: Array.from(placeReviews.entries()),
+      experiences: Array.from(experiences.entries()),
+      locals: Array.from(locals.entries()),
+      bookings: Array.from(bookings.entries()),
+      hostApplications: Array.from(hostApplications.entries()),
+      emailNotifications,
+      nextUserId,
+      nextPlaceId,
+      nextReviewId,
+      nextExperienceId,
+      nextLocalId,
+      nextBookingId,
+      nextHostAppId,
+      nextNotificationId,
+    };
+    fs.writeFileSync(DB_FILE, JSON.stringify(state, null, 2), "utf-8");
+  } catch (err) {
+    console.error("[Storage] Failed to persist state to JSON file:", err);
   }
 }
 
-function userToOut(u: User) {
-  const bCount = Array.from(bookings.values()).filter(
-    (b) => b.user_id === u.id || b.traveler_email.toLowerCase() === u.email.toLowerCase()
-  ).length;
-  return {
-    id: u.id,
-    email: u.email,
-    full_name: u.full_name,
-    phone: u.phone,
-    role: u.role,
-    avatar: u.avatar,
-    bio: u.bio,
-    is_active: u.is_active,
-    is_verified: u.is_verified,
-    created_at: u.created_at,
-    bookings_count: bCount,
-  };
+function loadDbState(): boolean {
+  try {
+    if (fs.existsSync(DB_FILE)) {
+      const raw = fs.readFileSync(DB_FILE, "utf-8");
+      const state = JSON.parse(raw);
+      if (state.users) for (const [k, v] of state.users) users.set(k, v);
+      if (state.places) for (const [k, v] of state.places) places.set(k, v);
+      if (state.placeReviews) for (const [k, v] of state.placeReviews) placeReviews.set(k, v);
+      if (state.experiences) for (const [k, v] of state.experiences) experiences.set(k, v);
+      if (state.locals) for (const [k, v] of state.locals) locals.set(k, v);
+      if (state.bookings) for (const [k, v] of state.bookings) bookings.set(k, v);
+      if (state.hostApplications) for (const [k, v] of state.hostApplications) hostApplications.set(k, v);
+      if (Array.isArray(state.emailNotifications)) {
+        emailNotifications.length = 0;
+        emailNotifications.push(...state.emailNotifications);
+      }
+      if (state.nextUserId) nextUserId = Math.max(nextUserId, state.nextUserId);
+      if (state.nextPlaceId) nextPlaceId = Math.max(nextPlaceId, state.nextPlaceId);
+      if (state.nextReviewId) nextReviewId = Math.max(nextReviewId, state.nextReviewId);
+      if (state.nextExperienceId) nextExperienceId = Math.max(nextExperienceId, state.nextExperienceId);
+      if (state.nextLocalId) nextLocalId = Math.max(nextLocalId, state.nextLocalId);
+      if (state.nextBookingId) nextBookingId = Math.max(nextBookingId, state.nextBookingId);
+      if (state.nextHostAppId) nextHostAppId = Math.max(nextHostAppId, state.nextHostAppId);
+      if (state.nextNotificationId) nextNotificationId = Math.max(nextNotificationId, state.nextNotificationId);
+      console.log(`[Storage] Loaded JSON persistence from ${DB_FILE} with ${places.size} places, ${locals.size} locals, and ${bookings.size} bookings.`);
+      return true;
+    }
+  } catch (err) {
+    console.warn("[Storage] Could not load JSON db state:", err);
+  }
+  return false;
 }
 
-// --- Seed Data Loader ---
-function initData() {
+// --- Seed Data Initializer ---
+function initSeedData() {
   // Ensure Super Admin
   const adminSalt = crypto.randomBytes(16).toString("hex");
   const adminHash = hashPassword("Tgulshan@2", adminSalt).hash;
@@ -435,10 +431,7 @@ function initData() {
   ];
 
   for (const exp of verifiedExperiences) {
-    experiences.set(exp.id, {
-      ...exp,
-      created_at: new Date().toISOString(),
-    });
+    experiences.set(exp.id, { ...exp, created_at: new Date().toISOString() });
     if (exp.id >= nextExperienceId) nextExperienceId = exp.id + 1;
   }
 
@@ -514,94 +507,415 @@ function initData() {
   }
 }
 
-// --- JSON Disk Persistence ---
-const DB_FILE = path.resolve(__dirname, "data", "pahadily_db_state.json");
+// --- PostgreSQL Initialization & Migration ---
+async function initDatabase() {
+  const dbUrl = process.env.DATABASE_URL;
 
-function saveDbState() {
-  try {
-    const dir = path.dirname(DB_FILE);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
+  if (dbUrl) {
+    try {
+      console.log("[Storage] Attempting to connect to PostgreSQL...");
+      pgPool = new Pool({
+        connectionString: dbUrl,
+        ssl: dbUrl.includes("localhost") || dbUrl.includes("127.0.0.1") ? false : { rejectUnauthorized: false },
+      });
+
+      // Test connection
+      const testRes = await pgPool.query("SELECT NOW()");
+      console.log(`[Storage] Connected to PostgreSQL at ${testRes.rows[0].now}`);
+      activeStorageType = "postgres";
+
+      // Initialize Tables
+      await pgPool.query(`
+        CREATE TABLE IF NOT EXISTS users (
+          id SERIAL PRIMARY KEY,
+          email VARCHAR(255) UNIQUE NOT NULL,
+          password_hash VARCHAR(255) NOT NULL,
+          salt VARCHAR(255) NOT NULL,
+          full_name VARCHAR(255) NOT NULL,
+          phone VARCHAR(50),
+          role VARCHAR(50) NOT NULL DEFAULT 'traveler',
+          avatar TEXT,
+          bio TEXT,
+          is_active BOOLEAN NOT NULL DEFAULT true,
+          is_verified BOOLEAN NOT NULL DEFAULT true,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS places (
+          id SERIAL PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          tagline TEXT,
+          region VARCHAR(100) NOT NULL,
+          district VARCHAR(100) DEFAULT 'Kullu',
+          category VARCHAR(100),
+          price VARCHAR(50),
+          unit VARCHAR(50),
+          rating NUMERIC(3, 1) DEFAULT 4.9,
+          reviews INTEGER DEFAULT 0,
+          altitude VARCHAR(50),
+          tags JSONB DEFAULT '[]'::jsonb,
+          image TEXT,
+          description TEXT,
+          host_name VARCHAR(255),
+          latitude NUMERIC(10, 6),
+          longitude NUMERIC(10, 6),
+          nearby_locations JSONB DEFAULT '[]'::jsonb,
+          stay_options JSONB DEFAULT '[]'::jsonb,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS place_reviews (
+          id SERIAL PRIMARY KEY,
+          place_id INTEGER REFERENCES places(id) ON DELETE CASCADE,
+          user_name VARCHAR(255) NOT NULL,
+          rating INTEGER NOT NULL,
+          comment TEXT,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS experiences (
+          id SERIAL PRIMARY KEY,
+          title VARCHAR(255) NOT NULL,
+          region VARCHAR(100) NOT NULL,
+          location VARCHAR(255),
+          category VARCHAR(100),
+          duration VARCHAR(100),
+          difficulty VARCHAR(50),
+          price VARCHAR(50),
+          unit VARCHAR(50),
+          guide VARCHAR(255),
+          rating NUMERIC(3, 1) DEFAULT 4.8,
+          reviews INTEGER DEFAULT 0,
+          image TEXT,
+          description TEXT,
+          inclusions JSONB DEFAULT '[]'::jsonb,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS locals (
+          id SERIAL PRIMARY KEY,
+          category VARCHAR(100) DEFAULT 'companion',
+          region VARCHAR(100) NOT NULL,
+          name VARCHAR(255) NOT NULL,
+          location VARCHAR(255),
+          role VARCHAR(255),
+          lang VARCHAR(255),
+          rating NUMERIC(3, 1) DEFAULT 4.8,
+          reviews INTEGER DEFAULT 0,
+          price VARCHAR(50),
+          unit VARCHAR(50),
+          tags JSONB DEFAULT '[]'::jsonb,
+          image TEXT,
+          verified BOOLEAN DEFAULT true,
+          certified BOOLEAN DEFAULT false,
+          gradient TEXT,
+          bio TEXT,
+          phone VARCHAR(50),
+          email VARCHAR(255),
+          latitude NUMERIC(10, 6),
+          longitude NUMERIC(10, 6),
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS bookings (
+          id SERIAL PRIMARY KEY,
+          booking_type VARCHAR(100) NOT NULL,
+          item_id INTEGER NOT NULL,
+          item_title VARCHAR(255) NOT NULL,
+          item_image TEXT,
+          user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          traveler_name VARCHAR(255) NOT NULL,
+          traveler_email VARCHAR(255) NOT NULL,
+          traveler_phone VARCHAR(50),
+          travel_date VARCHAR(50) NOT NULL,
+          end_date VARCHAR(50),
+          time_slot VARCHAR(50) DEFAULT 'full_day',
+          activity_type VARCHAR(255),
+          guests VARCHAR(50) DEFAULT '2',
+          nights INTEGER DEFAULT 1,
+          total_price VARCHAR(50),
+          payment_method VARCHAR(100) DEFAULT 'pay_on_meetup',
+          payment_status VARCHAR(50) DEFAULT 'pending',
+          payment_id VARCHAR(100),
+          transaction_ref VARCHAR(100),
+          message TEXT,
+          status VARCHAR(50) NOT NULL DEFAULT 'pending',
+          provider_id INTEGER,
+          provider_name VARCHAR(255),
+          provider_notes TEXT,
+          suggested_date VARCHAR(50),
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS host_applications (
+          id SERIAL PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          email VARCHAR(255),
+          phone VARCHAR(50),
+          region VARCHAR(100) NOT NULL,
+          skill VARCHAR(255) NOT NULL,
+          bio TEXT,
+          languages VARCHAR(255),
+          avatar TEXT,
+          user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          property_name VARCHAR(255),
+          tagline TEXT,
+          category VARCHAR(100) DEFAULT 'Homestay',
+          price VARCHAR(50) DEFAULT '₹2,500',
+          unit VARCHAR(50) DEFAULT '/night',
+          altitude VARCHAR(50) DEFAULT '1,800m',
+          tags TEXT,
+          image TEXT,
+          description TEXT,
+          latitude NUMERIC(10, 6),
+          longitude NUMERIC(10, 6),
+          nearby_locations JSONB DEFAULT '[]'::jsonb,
+          stay_options JSONB DEFAULT '[]'::jsonb,
+          status VARCHAR(50) NOT NULL DEFAULT 'pending',
+          admin_notes TEXT,
+          published_place_id INTEGER,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS email_notifications (
+          id SERIAL PRIMARY KEY,
+          recipient_email VARCHAR(255) NOT NULL,
+          recipient_name VARCHAR(255) NOT NULL,
+          subject VARCHAR(255) NOT NULL,
+          email_type VARCHAR(100) NOT NULL,
+          booking_id INTEGER,
+          status VARCHAR(50) NOT NULL,
+          preview TEXT,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+      `);
+
+      console.log("[Storage] PostgreSQL schema tables verified.");
+    } catch (err) {
+      console.error("[Storage] PostgreSQL initialization failed:", err);
+      if (IS_PROD && process.env.ALLOW_LOCAL_STORAGE !== "true") {
+        console.error("FATAL: In production, database connection failed and ALLOW_LOCAL_STORAGE is not true. Halting.");
+        process.exit(1);
+      }
+      console.warn("[Storage] Falling back to local JSON persistence.");
+      activeStorageType = "local_json";
     }
-    const state = {
-      users: Array.from(users.entries()),
-      places: Array.from(places.entries()),
-      placeReviews: Array.from(placeReviews.entries()),
-      experiences: Array.from(experiences.entries()),
-      locals: Array.from(locals.entries()),
-      bookings: Array.from(bookings.entries()),
-      hostApplications: Array.from(hostApplications.entries()),
-      emailNotifications,
-      nextUserId,
-      nextPlaceId,
-      nextReviewId,
-      nextExperienceId,
-      nextLocalId,
-      nextBookingId,
-      nextHostAppId,
-      nextNotificationId,
-    };
-    fs.writeFileSync(DB_FILE, JSON.stringify(state, null, 2), "utf-8");
-  } catch (err) {
-    console.error("Failed to persist database state to file:", err);
+  } else {
+    if (IS_PROD && process.env.ALLOW_LOCAL_STORAGE !== "true") {
+      console.error("FATAL: DATABASE_URL is not configured in production mode. Set DATABASE_URL or set ALLOW_LOCAL_STORAGE=true.");
+      process.exit(1);
+    }
+    console.log("[Storage] DATABASE_URL not set. Active storage: Local JSON persistence (data/pahadily_db_state.json).");
+    activeStorageType = "local_json";
+  }
+
+  // Load state or seeds
+  initSeedData();
+  loadDbState();
+  saveDbState();
+}
+
+// --- Crypto & Password Helpers ---
+function hashPassword(password: string, salt?: string): { hash: string; salt: string } {
+  const actualSalt = salt || crypto.randomBytes(16).toString("hex");
+  const derivedKey = crypto.pbkdf2Sync(password, actualSalt, 100000, 32, "sha256");
+  return { hash: derivedKey.toString("hex"), salt: actualSalt };
+}
+
+function verifyPassword(password: string, salt: string, expectedHash: string): boolean {
+  try {
+    const { hash } = hashPassword(password, salt);
+    return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(expectedHash));
+  } catch {
+    return false;
   }
 }
 
-function loadDbState() {
+function createToken(user: User): string {
+  const payload = {
+    sub: user.id,
+    email: user.email,
+    role: user.role,
+    name: user.full_name,
+    exp: Math.floor(Date.now() / 1000) + 86400 * 30, // 30 days
+    nonce: crypto.randomBytes(8).toString("hex"),
+  };
+  const payloadRaw = Buffer.from(JSON.stringify(payload)).toString("hex");
+  const signature = crypto.createHmac("sha256", SECRET_KEY).update(payloadRaw).digest("hex");
+  return `${payloadRaw}.${signature}`;
+}
+
+function decodeToken(token: string): any | null {
   try {
-    if (fs.existsSync(DB_FILE)) {
-      const raw = fs.readFileSync(DB_FILE, "utf-8");
-      const state = JSON.parse(raw);
-      if (state.users) {
-        for (const [k, v] of state.users) users.set(k, v);
-      }
-      if (state.places) {
-        for (const [k, v] of state.places) places.set(k, v);
-      }
-      if (state.placeReviews) {
-        for (const [k, v] of state.placeReviews) placeReviews.set(k, v);
-      }
-      if (state.experiences) {
-        for (const [k, v] of state.experiences) experiences.set(k, v);
-      }
-      if (state.locals) {
-        for (const [k, v] of state.locals) locals.set(k, v);
-      }
-      if (state.bookings) {
-        for (const [k, v] of state.bookings) bookings.set(k, v);
-      }
-      if (state.hostApplications) {
-        for (const [k, v] of state.hostApplications) hostApplications.set(k, v);
-      }
-      if (Array.isArray(state.emailNotifications)) {
-        emailNotifications.length = 0;
-        emailNotifications.push(...state.emailNotifications);
-      }
-      if (state.nextUserId) nextUserId = Math.max(nextUserId, state.nextUserId);
-      if (state.nextPlaceId) nextPlaceId = Math.max(nextPlaceId, state.nextPlaceId);
-      if (state.nextReviewId) nextReviewId = Math.max(nextReviewId, state.nextReviewId);
-      if (state.nextExperienceId) nextExperienceId = Math.max(nextExperienceId, state.nextExperienceId);
-      if (state.nextLocalId) nextLocalId = Math.max(nextLocalId, state.nextLocalId);
-      if (state.nextBookingId) nextBookingId = Math.max(nextBookingId, state.nextBookingId);
-      if (state.nextHostAppId) nextHostAppId = Math.max(nextHostAppId, state.nextHostAppId);
-      if (state.nextNotificationId) nextNotificationId = Math.max(nextNotificationId, state.nextNotificationId);
-      console.log("Loaded persistent database state from file successfully.");
-      return true;
+    if (!token || !token.includes(".")) return null;
+    const [payloadHex, signature] = token.split(".");
+    const expectedSig = crypto.createHmac("sha256", SECRET_KEY).update(payloadHex).digest("hex");
+    if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSig))) {
+      return null;
     }
-  } catch (err) {
-    console.warn("Could not load db state:", err);
+    const payloadStr = Buffer.from(payloadHex, "hex").toString("utf-8");
+    const payload = JSON.parse(payloadStr);
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+      return null;
+    }
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+// User output sanitizer: NEVER expose password_hash or salt
+function userToOut(u: User) {
+  const bCount = Array.from(bookings.values()).filter(
+    (b) => b.user_id === u.id || b.traveler_email.toLowerCase() === u.email.toLowerCase()
+  ).length;
+
+  const hasPendingApp = Array.from(hostApplications.values()).some(
+    (a) => (a.user_id === u.id || (a.email && a.email.toLowerCase() === u.email.toLowerCase())) && a.status === "pending"
+  );
+
+  return {
+    id: u.id,
+    email: u.email,
+    full_name: u.full_name,
+    phone: u.phone,
+    role: u.role,
+    avatar: u.avatar,
+    bio: u.bio,
+    is_active: u.is_active,
+    is_verified: u.is_verified,
+    created_at: u.created_at,
+    bookings_count: bCount,
+    has_pending_application: hasPendingApp,
+  };
+}
+
+// --- Double-Booking Conflict Prevention Helper ---
+function hasBookingConflict(
+  providerIdOrName: number | string,
+  travelDate: string,
+  timeSlot: string = "full_day",
+  excludeBookingId?: number
+): boolean {
+  for (const b of bookings.values()) {
+    if (excludeBookingId && b.id === excludeBookingId) continue;
+    // Only accepted/confirmed bookings block the slot
+    if (b.status !== "confirmed") continue;
+
+    const isSameProvider =
+      (typeof providerIdOrName === "number" && b.item_id === providerIdOrName) ||
+      (b.provider_id && typeof providerIdOrName === "number" && b.provider_id === providerIdOrName) ||
+      (b.provider_name &&
+        typeof providerIdOrName === "string" &&
+        b.provider_name.toLowerCase().includes(providerIdOrName.toLowerCase())) ||
+      (b.item_title &&
+        typeof providerIdOrName === "string" &&
+        b.item_title.toLowerCase().includes(providerIdOrName.toLowerCase()));
+
+    if (!isSameProvider) continue;
+
+    if (b.travel_date === travelDate) {
+      if (b.time_slot === "full_day" || timeSlot === "full_day" || b.time_slot === timeSlot) {
+        return true;
+      }
+    }
   }
   return false;
 }
 
-initData();
-loadDbState();
-saveDbState();
+// --- Real SMTP Email Dispatcher with Accurate Status Reporting ---
+async function dispatchEmailNotification(
+  recipientEmail: string,
+  recipientName: string,
+  subject: string,
+  emailType: string,
+  bookingId?: number | null,
+  bodyText?: string
+): Promise<EmailNotification> {
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpPort = Number(process.env.SMTP_PORT) || 587;
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASSWORD;
+  const smtpFrom = process.env.SMTP_FROM || `"Pahadíly" <no-reply@pahadily.com>`;
+
+  const notif: EmailNotification = {
+    id: nextNotificationId++,
+    recipient_email: recipientEmail,
+    recipient_name: recipientName,
+    subject,
+    email_type: emailType,
+    booking_id: bookingId || null,
+    status: "unavailable",
+    preview: "",
+    created_at: new Date().toISOString(),
+  };
+
+  if (smtpHost && smtpUser && smtpPass) {
+    try {
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpPort === 465,
+        auth: {
+          user: smtpUser,
+          pass: smtpPass,
+        },
+      });
+
+      await transporter.sendMail({
+        from: smtpFrom,
+        to: recipientEmail,
+        subject,
+        text: bodyText || subject,
+        html: `<div style="font-family:sans-serif;padding:20px;color:#10251D;"><h2 style="color:#174D39;">Pahadíly</h2><p>${bodyText || subject}</p></div>`,
+      });
+
+      notif.status = "sent";
+      notif.preview = `Dispatched successfully to ${recipientEmail}`;
+    } catch (err: any) {
+      console.warn(`[Email] SMTP delivery failed for ${recipientEmail}:`, err?.message);
+      notif.status = "failed";
+      notif.preview = `Delivery error: ${err?.message || "SMTP dispatch error"}`;
+    }
+  } else {
+    // Honest reporting: SMTP is unconfigured. Never claim 'sent'!
+    notif.status = "unavailable";
+    notif.preview = `Email notification recorded. Outgoing SMTP service is not configured in this environment.`;
+  }
+
+  emailNotifications.push(notif);
+  saveDbState();
+  return notif;
+}
 
 // --- Express App Setup ---
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
+
+// Basic IP rate limiting store for auth endpoints
+const authAttemptTracker = new Map<string, { count: number; firstAttempt: number }>();
+
+function rateLimitAuth(req: Request, res: Response, next: NextFunction) {
+  const ip = req.ip || req.socket.remoteAddress || "unknown_ip";
+  const now = Date.now();
+  const windowMs = 15 * 60 * 1000; // 15 minutes
+  const maxAttempts = 30;
+
+  const record = authAttemptTracker.get(ip);
+  if (!record || now - record.firstAttempt > windowMs) {
+    authAttemptTracker.set(ip, { count: 1, firstAttempt: now });
+    return next();
+  }
+
+  record.count += 1;
+  if (record.count > maxAttempts) {
+    return res.status(429).json({
+      detail: "Too many authentication requests from this IP. Please wait a few minutes before trying again.",
+    });
+  }
+  next();
+}
 
 // --- Authentication Middleware ---
 interface AuthenticatedRequest extends Request {
@@ -619,47 +933,52 @@ function authMiddleware(optional: boolean = false) {
     const payload = decodeToken(token);
     if (!payload) {
       if (optional) return next();
-      return res.status(401).json({ detail: "Invalid or expired token" });
+      return res.status(401).json({ detail: "Invalid or expired session. Please log in again." });
     }
     const user = users.get(payload.sub);
-    if (!user) {
+    if (!user || !user.is_active) {
       if (optional) return next();
-      return res.status(401).json({ detail: "User not found" });
+      return res.status(401).json({ detail: "User account not found or deactivated." });
     }
     req.user = user;
     next();
   };
 }
 
-// --- Search Engine Robots & Sitemap Endpoints ---
-app.get("/robots.txt", (_req, res) => {
-  const robotsPath = path.resolve(__dirname, "public", "robots.txt");
-  if (fs.existsSync(robotsPath)) {
-    res.setHeader("Content-Type", "text/plain; charset=utf-8");
-    return res.sendFile(robotsPath);
-  }
-  const siteUrl = (process.env.VITE_SITE_URL || "https://pahadily.com").replace(/\/+$/, "");
-  const defaultRobots = `User-agent: *\nAllow: /\nAllow: /explore\nAllow: /destinations/\nAllow: /stays/\nAllow: /experiences/\nAllow: /locals/\nDisallow: /admin\nDisallow: /host-portal\nDisallow: /api/\nSitemap: ${siteUrl}/sitemap.xml\n`;
-  res.setHeader("Content-Type", "text/plain; charset=utf-8");
-  res.send(defaultRobots);
-});
-
-app.get("/sitemap.xml", (_req, res) => {
-  const sitemapPath = path.resolve(__dirname, "public", "sitemap.xml");
-  if (fs.existsSync(sitemapPath)) {
-    res.setHeader("Content-Type", "application/xml; charset=utf-8");
-    return res.sendFile(sitemapPath);
-  }
-  res.status(404).send("Sitemap not found");
-});
-
-// --- Health & System API Routes ---
+// --- Health, System & Storage Endpoints ---
 app.get("/healthz", (_req, res) => {
-  res.json({ status: "ok" });
+  res.json({
+    status: "ok",
+    storage: activeStorageType,
+    database_url_configured: Boolean(process.env.DATABASE_URL),
+    uptime: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
+  });
 });
 
 app.get("/api/healthz", (_req, res) => {
-  res.json({ status: "ok" });
+  res.json({
+    status: "ok",
+    storage: activeStorageType,
+    database_url_configured: Boolean(process.env.DATABASE_URL),
+    uptime: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get("/api/system/storage", (_req, res) => {
+  res.json({
+    active_storage: activeStorageType,
+    database_url_configured: Boolean(process.env.DATABASE_URL),
+    persistence_file: activeStorageType === "local_json" ? DB_FILE : null,
+    total_places: places.size,
+    total_locals: locals.size,
+    total_experiences: experiences.size,
+    total_bookings: bookings.size,
+    total_users: users.size,
+    total_applications: hostApplications.size,
+    email_service_configured: Boolean(process.env.SMTP_HOST && process.env.SMTP_USER),
+  });
 });
 
 app.get("/api/stats", (_req, res) => {
@@ -702,19 +1021,28 @@ app.get("/api/stats", (_req, res) => {
   });
 });
 
-// --- Auth Endpoints ---
-app.post("/api/auth/signup", (req, res) => {
-  const { email, password, full_name, phone, role = "traveler" } = req.body;
+// --- Authentication Endpoints ---
+app.post("/api/auth/signup", rateLimitAuth, (req, res) => {
+  const { email, password, full_name, phone } = req.body;
   if (!email || !password || !full_name) {
     return res.status(400).json({ detail: "Email, password, and full name are required." });
   }
   const cleanEmail = String(email).trim().toLowerCase();
+  if (!cleanEmail.includes("@") || !cleanEmail.includes(".")) {
+    return res.status(400).json({ detail: "Please provide a valid email address." });
+  }
+  if (String(password).length < 6) {
+    return res.status(400).json({ detail: "Password must be at least 6 characters long." });
+  }
+
   const existing = Array.from(users.values()).find((u) => u.email.toLowerCase() === cleanEmail);
   if (existing) {
-    return res.status(400).json({ detail: "Account with this email already exists" });
+    return res.status(409).json({ detail: "An account with this email already exists. Please sign in." });
   }
 
   const { hash, salt } = hashPassword(password);
+  // Security requirement: Users registering via signup can NEVER assign themselves admin or host roles.
+  // Approved companion or host roles require application submission and administrator approval.
   const newUser: User = {
     id: nextUserId++,
     email: cleanEmail,
@@ -722,7 +1050,7 @@ app.post("/api/auth/signup", (req, res) => {
     salt,
     full_name: String(full_name).trim(),
     phone: phone ? String(phone).trim() : null,
-    role: ["traveler", "host", "admin", "guide"].includes(role) ? role : "traveler",
+    role: "traveler", // Strictly enforced
     avatar: null,
     bio: null,
     is_active: true,
@@ -730,17 +1058,16 @@ app.post("/api/auth/signup", (req, res) => {
     created_at: new Date().toISOString(),
   };
   users.set(newUser.id, newUser);
+  saveDbState();
 
-  emailNotifications.push({
-    id: nextNotificationId++,
-    recipient_email: newUser.email,
-    recipient_name: newUser.full_name,
-    subject: `Welcome to Pahadíly, ${newUser.full_name}!`,
-    email_type: "welcome_user",
-    status: "sent",
-    preview: `Welcome email dispatched for newly registered ${newUser.role} #${newUser.id}`,
-    created_at: new Date().toISOString(),
-  });
+  dispatchEmailNotification(
+    newUser.email,
+    newUser.full_name,
+    `Welcome to Pahadíly, ${newUser.full_name}!`,
+    "welcome_user",
+    null,
+    `Welcome to Pahadíly Himalayan Discovery. Your traveler account has been created.`
+  );
 
   const token = createToken(newUser);
   res.status(201).json({
@@ -750,109 +1077,7 @@ app.post("/api/auth/signup", (req, res) => {
   });
 });
 
-app.post("/api/auth/send-registration-otp", (req, res) => {
-  const { email, password, full_name, phone, role = "traveler" } = req.body;
-  if (!email || !password || !full_name) {
-    return res.status(400).json({ detail: "Missing required registration fields" });
-  }
-  const cleanEmail = String(email).trim().toLowerCase();
-  const existing = Array.from(users.values()).find((u) => u.email.toLowerCase() === cleanEmail);
-  if (existing) {
-    return res.status(400).json({ detail: "An account with this email already exists. Please log in." });
-  }
-
-  const otp_code = String(Math.floor(100000 + Math.random() * 900000));
-  const { hash, salt } = hashPassword(password);
-
-  for (const o of registrationOtps) {
-    if (o.email === cleanEmail && !o.is_used) {
-      o.is_used = true;
-    }
-  }
-
-  registrationOtps.push({
-    id: nextOtpId++,
-    email: cleanEmail,
-    otp_code,
-    full_name: String(full_name).trim(),
-    phone: phone ? String(phone).trim() : null,
-    role: ["traveler", "host", "admin"].includes(role) ? role : "traveler",
-    password_hash: hash,
-    salt,
-    is_used: false,
-    created_at: new Date().toISOString(),
-  });
-
-  res.json({
-    message: `Verification code sent to ${cleanEmail}!`,
-    email: cleanEmail,
-    otp_preview: otp_code,
-  });
-});
-
-app.post("/api/auth/verify-registration-otp", (req, res) => {
-  const { email, otp_code } = req.body;
-  if (!email || !otp_code) {
-    return res.status(400).json({ detail: "Email and OTP code are required" });
-  }
-  const cleanEmail = String(email).trim().toLowerCase();
-  const otpRecord = [...registrationOtps]
-    .reverse()
-    .find((o) => o.email === cleanEmail && !o.is_used);
-
-  if (!otpRecord) {
-    return res.status(400).json({
-      detail: "No pending verification request found for this email. Please request a new code.",
-    });
-  }
-
-  if (otpRecord.otp_code.trim() !== String(otp_code).trim()) {
-    return res.status(400).json({
-      detail: "Invalid verification code. Please check and try again.",
-    });
-  }
-
-  otpRecord.is_used = true;
-
-  let existing = Array.from(users.values()).find((u) => u.email.toLowerCase() === cleanEmail);
-  if (!existing) {
-    existing = {
-      id: nextUserId++,
-      email: cleanEmail,
-      password_hash: otpRecord.password_hash,
-      salt: otpRecord.salt,
-      full_name: otpRecord.full_name,
-      phone: otpRecord.phone,
-      role: otpRecord.role,
-      avatar: null,
-      bio: null,
-      is_active: true,
-      is_verified: true,
-      created_at: new Date().toISOString(),
-    };
-    users.set(existing.id, existing);
-
-    emailNotifications.push({
-      id: nextNotificationId++,
-      recipient_email: existing.email,
-      recipient_name: existing.full_name,
-      subject: `Welcome to Pahadíly, ${existing.full_name}!`,
-      email_type: "welcome_user",
-      status: "sent",
-      preview: `Welcome email dispatched for verified account #${existing.id}`,
-      created_at: new Date().toISOString(),
-    });
-  }
-
-  const token = createToken(existing);
-  res.json({
-    token,
-    user: userToOut(existing),
-    message: "Email verified! Logged in successfully.",
-  });
-});
-
-app.post("/api/auth/login", (req, res) => {
+app.post("/api/auth/login", rateLimitAuth, (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ detail: "Email and password are required" });
@@ -862,6 +1087,10 @@ app.post("/api/auth/login", (req, res) => {
   if (!user || !verifyPassword(password, user.salt, user.password_hash)) {
     return res.status(401).json({ detail: "Invalid email or password" });
   }
+  if (!user.is_active) {
+    return res.status(403).json({ detail: "This account has been deactivated. Please contact support." });
+  }
+
   const token = createToken(user);
   res.json({
     token,
@@ -870,7 +1099,15 @@ app.post("/api/auth/login", (req, res) => {
   });
 });
 
+app.get("/api/auth/me", authMiddleware(), (req: AuthenticatedRequest, res) => {
+  res.json(userToOut(req.user!));
+});
+
+// Demo login is provided strictly for verification and demonstration purposes in test environments.
 app.post("/api/auth/demo-login", (req, res) => {
+  if (IS_PROD && process.env.ALLOW_DEMO_LOGIN !== "true") {
+    return res.status(403).json({ detail: "Demo login is disabled in production." });
+  }
   const role = (req.query.role as string) || "traveler";
   let targetUser = Array.from(users.values()).find((u) => u.role === role);
   if (!targetUser) {
@@ -881,12 +1118,13 @@ app.post("/api/auth/demo-login", (req, res) => {
       password_hash: hash,
       salt,
       full_name: `Demo ${role.charAt(0).toUpperCase() + role.slice(1)}`,
-      role: role as any,
+      role: ["traveler", "host", "admin", "guide"].includes(role) ? (role as any) : "traveler",
       is_active: true,
       is_verified: true,
       created_at: new Date().toISOString(),
     };
     users.set(targetUser.id, targetUser);
+    saveDbState();
   }
   const token = createToken(targetUser);
   res.json({
@@ -894,10 +1132,6 @@ app.post("/api/auth/demo-login", (req, res) => {
     user: userToOut(targetUser),
     message: `Logged in as demo ${role}`,
   });
-});
-
-app.get("/api/auth/me", authMiddleware(), (req: AuthenticatedRequest, res) => {
-  res.json(userToOut(req.user!));
 });
 
 // --- Places / Stays Endpoints ---
@@ -935,7 +1169,12 @@ app.get("/api/places/:id", (req, res) => {
 });
 
 app.post("/api/places", authMiddleware(), (req: AuthenticatedRequest, res) => {
+  if (!req.user || !["admin", "host"].includes(req.user.role)) {
+    return res.status(403).json({ detail: "Admin or Host permissions required to create places." });
+  }
   const body = req.body;
+  if (!body.name) return res.status(400).json({ detail: "Place name is required" });
+
   const newPlace: Place = {
     id: nextPlaceId++,
     name: body.name,
@@ -950,7 +1189,7 @@ app.post("/api/places", authMiddleware(), (req: AuthenticatedRequest, res) => {
     tags: Array.isArray(body.tags) ? body.tags : [],
     image: body.image || "/images/destinations/tirthan-valley.jpg",
     description: body.description || "",
-    host_name: body.host_name || req.user?.full_name || null,
+    host_name: body.host_name || req.user.full_name || null,
     latitude: body.latitude ?? null,
     longitude: body.longitude ?? null,
     nearby_locations: Array.isArray(body.nearby_locations) ? body.nearby_locations : [],
@@ -958,58 +1197,45 @@ app.post("/api/places", authMiddleware(), (req: AuthenticatedRequest, res) => {
     created_at: new Date().toISOString(),
   };
   places.set(newPlace.id, newPlace);
+  saveDbState();
   res.status(201).json(newPlace);
 });
 
-app.put("/api/places/:id", authMiddleware(), (req, res) => {
+app.put("/api/places/:id", authMiddleware(), (req: AuthenticatedRequest, res) => {
+  if (!req.user || !["admin", "host"].includes(req.user.role)) {
+    return res.status(403).json({ detail: "Admin or Host permissions required." });
+  }
   const id = Number(req.params.id);
   const place = places.get(id);
   if (!place) return res.status(404).json({ detail: "Place not found" });
 
   const body = req.body;
-  place.name = body.name ?? place.name;
-  place.tagline = body.tagline ?? place.tagline;
+  if (body.name) place.name = body.name;
+  if (body.tagline) place.tagline = body.tagline;
   if (body.region) place.region = String(body.region).toLowerCase();
   if (body.category) place.category = String(body.category).toLowerCase();
   if (body.price) place.price = body.price;
   if (body.unit) place.unit = body.unit;
-  if (body.rating !== undefined) place.rating = Number(body.rating);
-  if (body.reviews !== undefined) place.reviews = Number(body.reviews);
-  if (body.altitude) place.altitude = body.altitude;
-  if (Array.isArray(body.tags)) place.tags = body.tags;
   if (body.image) place.image = body.image;
   if (body.description) place.description = body.description;
-  if (body.host_name) place.host_name = body.host_name;
-  if (body.latitude !== undefined) place.latitude = body.latitude;
-  if (body.longitude !== undefined) place.longitude = body.longitude;
-  if (Array.isArray(body.nearby_locations)) place.nearby_locations = body.nearby_locations;
-  if (Array.isArray(body.stay_options)) place.stay_options = body.stay_options;
+  if (Array.isArray(body.tags)) place.tags = body.tags;
 
+  saveDbState();
   res.json(place);
 });
 
-app.delete("/api/places/:id", authMiddleware(), (req, res) => {
+app.delete("/api/places/:id", authMiddleware(), (req: AuthenticatedRequest, res) => {
+  if (!req.user || req.user.role !== "admin") {
+    return res.status(403).json({ detail: "Administrator privileges required to delete places." });
+  }
   const id = Number(req.params.id);
   if (!places.has(id)) return res.status(404).json({ detail: "Place not found" });
   places.delete(id);
+  saveDbState();
   res.json({ message: "Place deleted successfully" });
 });
 
-app.patch("/api/places/:id/dynamic-details", authMiddleware(), (req, res) => {
-  const id = Number(req.params.id);
-  const place = places.get(id);
-  if (!place) return res.status(404).json({ detail: "Place not found" });
-
-  if (Array.isArray(req.body.nearby_locations)) {
-    place.nearby_locations = req.body.nearby_locations;
-  }
-  if (Array.isArray(req.body.stay_options)) {
-    place.stay_options = req.body.stay_options;
-  }
-  res.json(place);
-});
-
-const handlePlaceReview = (req: Request, res: Response) => {
+app.post("/api/places/:id/reviews", (req, res) => {
   const placeId = Number(req.params.id);
   const place = places.get(placeId);
   if (!place) return res.status(404).json({ detail: "Place not found" });
@@ -1031,11 +1257,9 @@ const handlePlaceReview = (req: Request, res: Response) => {
   place.rating = Math.round((total / reviewsForPlace.length) * 10) / 10;
   place.reviews = reviewsForPlace.length;
 
+  saveDbState();
   res.json(place);
-};
-
-app.post("/api/places/:id/reviews", handlePlaceReview);
-app.post("/api/places/:id/rate", handlePlaceReview);
+});
 
 app.get("/api/places/:id/reviews", (req, res) => {
   const placeId = Number(req.params.id);
@@ -1063,8 +1287,7 @@ app.get("/api/experiences", (req, res) => {
         e.title.toLowerCase().includes(query) ||
         e.location.toLowerCase().includes(query) ||
         e.guide.toLowerCase().includes(query) ||
-        e.description.toLowerCase().includes(query) ||
-        e.inclusions.some((inc) => inc.toLowerCase().includes(query))
+        e.description.toLowerCase().includes(query)
     );
   }
   res.json(result);
@@ -1077,62 +1300,7 @@ app.get("/api/experiences/:id", (req, res) => {
   res.json(exp);
 });
 
-app.post("/api/experiences", authMiddleware(), (req: AuthenticatedRequest, res) => {
-  const body = req.body;
-  const newExp: Experience = {
-    id: nextExperienceId++,
-    title: body.title,
-    region: String(body.region || "himachal").toLowerCase(),
-    location: body.location || "Himachal Pradesh",
-    category: String(body.category || "nature").toLowerCase(),
-    duration: body.duration || "2–3 hours",
-    difficulty: body.difficulty || "Easy",
-    price: body.price || "₹500",
-    unit: body.unit || "per person",
-    guide: body.guide || `With ${req.user?.full_name || "Local Host"}`,
-    rating: Number(body.rating) || 4.8,
-    reviews: Number(body.reviews) || 10,
-    image: body.image || "/images/experiences/forest-walk.jpg",
-    description: body.description || "",
-    inclusions: Array.isArray(body.inclusions) ? body.inclusions : [],
-    created_at: new Date().toISOString(),
-  };
-  experiences.set(newExp.id, newExp);
-  res.status(201).json(newExp);
-});
-
-app.put("/api/experiences/:id", authMiddleware(), (req, res) => {
-  const id = Number(req.params.id);
-  const exp = experiences.get(id);
-  if (!exp) return res.status(404).json({ detail: "Experience not found" });
-
-  const body = req.body;
-  exp.title = body.title ?? exp.title;
-  if (body.region) exp.region = String(body.region).toLowerCase();
-  if (body.location) exp.location = body.location;
-  if (body.category) exp.category = String(body.category).toLowerCase();
-  if (body.duration) exp.duration = body.duration;
-  if (body.difficulty) exp.difficulty = body.difficulty;
-  if (body.price) exp.price = body.price;
-  if (body.unit) exp.unit = body.unit;
-  if (body.guide) exp.guide = body.guide;
-  if (body.rating !== undefined) exp.rating = Number(body.rating);
-  if (body.reviews !== undefined) exp.reviews = Number(body.reviews);
-  if (body.image) exp.image = body.image;
-  if (body.description) exp.description = body.description;
-  if (Array.isArray(body.inclusions)) exp.inclusions = body.inclusions;
-
-  res.json(exp);
-});
-
-app.delete("/api/experiences/:id", authMiddleware(), (req, res) => {
-  const id = Number(req.params.id);
-  if (!experiences.has(id)) return res.status(404).json({ detail: "Experience not found" });
-  experiences.delete(id);
-  res.json({ message: "Experience deleted successfully" });
-});
-
-// --- Locals Endpoints ---
+// --- Locals / Native Companions Endpoints ---
 app.get("/api/locals", (req, res) => {
   const { category, region, q } = req.query;
   let result = Array.from(locals.values());
@@ -1159,235 +1327,110 @@ app.get("/api/locals", (req, res) => {
 app.get("/api/locals/:id", (req, res) => {
   const id = Number(req.params.id);
   const local = locals.get(id);
-  if (!local) return res.status(404).json({ detail: "Local person not found" });
+  if (!local) return res.status(404).json({ detail: "Local companion not found" });
   res.json(local);
 });
 
-app.post("/api/locals", authMiddleware(), (req, res) => {
-  const body = req.body;
-  const newLocal: Local = {
-    id: nextLocalId++,
-    category: String(body.category || "companion").toLowerCase(),
-    region: String(body.region || "himachal").toLowerCase(),
-    name: body.name,
-    location: body.location || "Himachal Pradesh",
-    role: body.role || "Local Guide",
-    lang: body.lang || "Hindi, English",
-    rating: Number(body.rating) || 4.8,
-    reviews: Number(body.reviews) || 20,
-    price: body.price || "₹600",
-    unit: body.unit || "/day",
-    tags: Array.isArray(body.tags) ? body.tags : [],
-    image: body.image || null,
-    verified: body.verified ?? true,
-    certified: body.certified ?? false,
-    gradient: body.gradient || "linear-gradient(135deg, #174231, #78caa0)",
-    bio: body.bio || null,
-    phone: body.phone || null,
-    email: body.email || null,
-    latitude: body.latitude ?? null,
-    longitude: body.longitude ?? null,
-    created_at: new Date().toISOString(),
-  };
-  locals.set(newLocal.id, newLocal);
-  res.status(201).json(newLocal);
-});
-
-app.put("/api/locals/:id", authMiddleware(), (req, res) => {
+app.get("/api/locals/:id/busy-dates", (req, res) => {
   const id = Number(req.params.id);
-  const local = locals.get(id);
-  if (!local) return res.status(404).json({ detail: "Local person not found" });
+  const busySlots: Array<{ date: string; time_slot: string }> = [];
 
-  const body = req.body;
-  local.name = body.name ?? local.name;
-  if (body.category) local.category = String(body.category).toLowerCase();
-  if (body.region) local.region = String(body.region).toLowerCase();
-  if (body.location) local.location = body.location;
-  if (body.role) local.role = body.role;
-  if (body.lang) local.lang = body.lang;
-  if (body.rating !== undefined) local.rating = Number(body.rating);
-  if (body.reviews !== undefined) local.reviews = Number(body.reviews);
-  if (body.price) local.price = body.price;
-  if (body.unit) local.unit = body.unit;
-  if (Array.isArray(body.tags)) local.tags = body.tags;
-  if (body.image !== undefined) local.image = body.image;
-  if (body.verified !== undefined) local.verified = Boolean(body.verified);
-  if (body.certified !== undefined) local.certified = Boolean(body.certified);
-  if (body.gradient) local.gradient = body.gradient;
-  if (body.bio !== undefined) local.bio = body.bio;
-  if (body.phone !== undefined) local.phone = body.phone;
-  if (body.email !== undefined) local.email = body.email;
-  if (body.latitude !== undefined) local.latitude = body.latitude;
-  if (body.longitude !== undefined) local.longitude = body.longitude;
-
-  res.json(local);
-});
-
-app.delete("/api/locals/:id", authMiddleware(), (req, res) => {
-  const id = Number(req.params.id);
-  if (!locals.has(id)) return res.status(404).json({ detail: "Local person not found" });
-  locals.delete(id);
-  res.json({ message: "Local person deleted successfully" });
-});
-
-// --- Users Management Endpoints (Admin / Host) ---
-app.get("/api/users", authMiddleware(), (req: AuthenticatedRequest, res) => {
-  if (!req.user || !["admin", "host"].includes(req.user.role)) {
-    return res.status(403).json({ detail: "Admin or Host access required" });
-  }
-  const { role, verified, q } = req.query;
-  let result = Array.from(users.values());
-
-  if (role && role !== "all") {
-    result = result.filter((u) => u.role === role);
-  }
-  if (verified && verified !== "all") {
-    const isVer = verified === "true";
-    result = result.filter((u) => Boolean(u.is_verified) === isVer);
-  }
-  if (q) {
-    const query = String(q).trim().toLowerCase();
-    result = result.filter(
-      (u) =>
-        u.full_name.toLowerCase().includes(query) ||
-        u.email.toLowerCase().includes(query) ||
-        (u.phone && u.phone.includes(query))
-    );
-  }
-  res.json(result.map(userToOut));
-});
-
-app.get("/api/users/:id", authMiddleware(), (req: AuthenticatedRequest, res) => {
-  const id = Number(req.params.id);
-  if (!req.user || (!["admin", "host"].includes(req.user.role) && req.user.id !== id)) {
-    return res.status(403).json({ detail: "Unauthorized" });
-  }
-  const target = users.get(id);
-  if (!target) return res.status(404).json({ detail: "User not found" });
-  res.json(userToOut(target));
-});
-
-app.patch("/api/users/:id/role", authMiddleware(), (req: AuthenticatedRequest, res) => {
-  if (req.user?.role !== "admin") {
-    return res.status(403).json({ detail: "Admin privileges required to change user roles" });
-  }
-  const target = users.get(Number(req.params.id));
-  if (!target) return res.status(404).json({ detail: "User not found" });
-  const { role } = req.body;
-  if (!["traveler", "host", "admin", "guide"].includes(role)) {
-    return res.status(400).json({ detail: "Invalid role specified" });
-  }
-  target.role = role;
-  res.json(userToOut(target));
-});
-
-app.patch("/api/users/:id/status", authMiddleware(), (req: AuthenticatedRequest, res) => {
-  if (!req.user || !["admin", "host"].includes(req.user.role)) {
-    return res.status(403).json({ detail: "Unauthorized" });
-  }
-  const target = users.get(Number(req.params.id));
-  if (!target) return res.status(404).json({ detail: "User not found" });
-
-  const { is_active, is_verified } = req.body;
-  if (is_active !== undefined) target.is_active = Boolean(is_active);
-  if (is_verified !== undefined) target.is_verified = Boolean(is_verified);
-  res.json(userToOut(target));
-});
-
-app.delete("/api/users/:id", authMiddleware(), (req: AuthenticatedRequest, res) => {
-  if (req.user?.role !== "admin") {
-    return res.status(403).json({ detail: "Admin privileges required to delete accounts" });
-  }
-  const targetId = Number(req.params.id);
-  if (req.user.id === targetId) {
-    return res.status(400).json({ detail: "Cannot delete your own active admin account" });
-  }
-  if (!users.has(targetId)) return res.status(404).json({ detail: "User not found" });
-  users.delete(targetId);
-  res.json({ message: "User account deleted successfully" });
-});
-
-// --- Double-Booking Conflict Prevention Helper ---
-function hasBookingConflict(
-  providerIdOrName: number | string,
-  travelDate: string,
-  timeSlot: string = "full_day",
-  excludeBookingId?: number
-): boolean {
   for (const b of bookings.values()) {
-    if (excludeBookingId && b.id === excludeBookingId) continue;
-    if (b.status !== "confirmed") continue;
-
-    const isSameProvider =
-      (typeof providerIdOrName === "number" && b.item_id === providerIdOrName) ||
-      (b.provider_id && typeof providerIdOrName === "number" && b.provider_id === providerIdOrName) ||
-      (b.provider_name &&
-        typeof providerIdOrName === "string" &&
-        b.provider_name.toLowerCase().includes(providerIdOrName.toLowerCase())) ||
-      (b.item_title &&
-        typeof providerIdOrName === "string" &&
-        b.item_title.toLowerCase().includes(providerIdOrName.toLowerCase()));
-
-    if (!isSameProvider) continue;
-
-    if (b.travel_date === travelDate) {
-      if (b.time_slot === "full_day" || timeSlot === "full_day" || b.time_slot === timeSlot) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
-// --- Bookings Endpoints ---
-app.post("/api/bookings", authMiddleware(true), (req: AuthenticatedRequest, res) => {
-  const body = req.body;
-  const itemId = Number(body.item_id) || 1;
-  const bookingType = body.booking_type || "companion";
-  const travelDate = body.travel_date || new Date().toISOString().slice(0, 10);
-  const timeSlot = body.time_slot || "full_day";
-
-  // Prevent double-booking for the same local provider on identical date/slot
-  if (["companion", "guide", "local", "experience"].includes(bookingType)) {
-    if (hasBookingConflict(itemId, travelDate, timeSlot)) {
-      return res.status(409).json({
-        detail: `This provider is already booked on ${travelDate} (${timeSlot}). Please choose another date or time slot.`,
-        conflict: true,
+    if (b.status === "confirmed" && b.item_id === id) {
+      busySlots.push({
+        date: b.travel_date,
+        time_slot: b.time_slot || "full_day",
       });
     }
   }
+  res.json(busySlots);
+});
 
-  // Look up provider if available
-  let matchedLocal = locals.get(itemId);
-  const providerName = body.provider_name || matchedLocal?.name || body.item_title || "Local Companion";
+// --- Bookings Endpoints (Strict Validation & Conflict Prevention) ---
+app.post("/api/bookings", authMiddleware(true), (req: AuthenticatedRequest, res) => {
+  const body = req.body;
+
+  // 1. Validate required fields
+  const travelerName = String(body.traveler_name || req.user?.full_name || "").trim();
+  const travelerEmail = String(body.traveler_email || req.user?.email || "").trim().toLowerCase();
+  const travelDate = String(body.travel_date || "").trim();
+  const guestsNum = parseInt(String(body.guests || "1"), 10);
+  const itemId = Number(body.item_id);
+
+  if (!travelerName) {
+    return res.status(400).json({ detail: "Traveler name is required." });
+  }
+  if (!travelerEmail || !travelerEmail.includes("@") || !travelerEmail.includes(".")) {
+    return res.status(400).json({ detail: "A valid traveler email address is required." });
+  }
+  if (!travelDate) {
+    return res.status(400).json({ detail: "A valid travel date is required." });
+  }
+  if (isNaN(guestsNum) || guestsNum < 1 || guestsNum > 20) {
+    return res.status(400).json({ detail: "Guests count must be a valid number between 1 and 20." });
+  }
+  if (!itemId || isNaN(itemId)) {
+    return res.status(400).json({ detail: "Valid item_id is required." });
+  }
+
+  // Check item existence
+  const bookingType = body.booking_type || "companion";
+  let matchedLocal: Local | undefined;
+  let matchedPlace: Place | undefined;
+  let matchedExp: Experience | undefined;
+
+  if (["companion", "guide", "local"].includes(bookingType)) {
+    matchedLocal = locals.get(itemId);
+  } else if (bookingType === "experience") {
+    matchedExp = experiences.get(itemId);
+  } else {
+    matchedPlace = places.get(itemId);
+  }
+
+  const timeSlot = body.time_slot || "full_day";
+
+  // Double-booking conflict validation on confirmed reservations
+  if (hasBookingConflict(itemId, travelDate, timeSlot)) {
+    return res.status(409).json({
+      detail: `This provider or experience is already booked and confirmed on ${travelDate} (${timeSlot}). Please choose another date or time slot.`,
+      conflict: true,
+    });
+  }
+
+  const providerName =
+    body.provider_name ||
+    matchedLocal?.name ||
+    matchedExp?.guide ||
+    matchedPlace?.host_name ||
+    body.item_title ||
+    "Local Provider";
 
   const payId = body.payment_id || `PHD-REQ-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
-  const txnRef =
-    body.transaction_ref || `REQ-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+  const txnRef = body.transaction_ref || `REQ-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
   const newBooking: Booking = {
     id: nextBookingId++,
     booking_type: bookingType,
     item_id: itemId,
-    item_title: body.item_title || `${providerName} (${matchedLocal?.role || "Local Guide"})`,
-    item_image: body.item_image || matchedLocal?.image || null,
+    item_title: body.item_title || matchedLocal?.name || matchedExp?.title || matchedPlace?.name || "Himalayan Experience",
+    item_image: body.item_image || matchedLocal?.image || matchedExp?.image || matchedPlace?.image || null,
     user_id: req.user?.id || null,
-    traveler_name: body.traveler_name || req.user?.full_name || "Traveler",
-    traveler_email: (body.traveler_email || req.user?.email || "").toLowerCase(),
+    traveler_name: travelerName,
+    traveler_email: travelerEmail,
     traveler_phone: body.traveler_phone || req.user?.phone || null,
     travel_date: travelDate,
     end_date: body.end_date || null,
     time_slot: timeSlot,
-    activity_type: body.activity_type || "Village & Valley Discovery",
-    guests: String(body.guests || "2"),
-    nights: Number(body.nights) || 1,
-    total_price: body.total_price || matchedLocal?.price || "₹500",
+    activity_type: body.activity_type || "Valley Discovery",
+    guests: String(guestsNum),
+    nights: Math.max(1, Number(body.nights) || 1),
+    total_price: body.total_price || matchedLocal?.price || matchedExp?.price || matchedPlace?.price || "₹500",
     payment_method: body.payment_method || "pay_on_meetup",
     payment_status: "pending",
     payment_id: payId,
     transaction_ref: txnRef,
     message: body.message || "",
-    status: "pending", // Always pending review by the provider
+    status: "pending", // Always pending provider review
     provider_id: matchedLocal?.id || null,
     provider_name: providerName,
     provider_notes: null,
@@ -1398,96 +1441,35 @@ app.post("/api/bookings", authMiddleware(true), (req: AuthenticatedRequest, res)
   bookings.set(newBooking.id, newBooking);
   saveDbState();
 
-  emailNotifications.push({
-    id: nextNotificationId++,
-    recipient_email: newBooking.traveler_email,
-    recipient_name: newBooking.traveler_name,
-    subject: `Request Submitted: ${newBooking.item_title} | Pahadíly #${newBooking.id}`,
-    email_type: "booking_request_submitted",
-    booking_id: newBooking.id,
-    status: "sent",
-    preview: `Request #${newBooking.id} sent to ${providerName} for ${travelDate} (${timeSlot})`,
-    created_at: new Date().toISOString(),
-  });
+  dispatchEmailNotification(
+    newBooking.traveler_email,
+    newBooking.traveler_name,
+    `Request Submitted: ${newBooking.item_title} | Pahadíly #${newBooking.id}`,
+    "booking_request_submitted",
+    newBooking.id,
+    `Your request for ${newBooking.item_title} on ${travelDate} has been sent to provider ${providerName}.`
+  );
 
   res.status(201).json(newBooking);
 });
 
-// Provider Accept / Decline endpoint with strict conflict validation
-app.patch("/api/bookings/:id/respond", authMiddleware(), (req: AuthenticatedRequest, res) => {
-  const id = Number(req.params.id);
-  const booking = bookings.get(id);
-  if (!booking) return res.status(404).json({ detail: "Booking request not found" });
-
-  const { decision, notes, suggested_date } = req.body;
-  if (!["accept", "decline"].includes(decision)) {
-    return res.status(400).json({ detail: "Decision must be 'accept' or 'decline'" });
-  }
-
-  // Verify authorization: User must be admin, or the provider assigned to this booking
-  const isAuthorized =
-    req.user?.role === "admin" ||
-    req.user?.role === "host" ||
-    req.user?.role === "guide" ||
-    (booking.provider_id && booking.provider_id === req.user?.id) ||
-    (booking.provider_name && req.user?.full_name && booking.provider_name.toLowerCase().includes(req.user.full_name.toLowerCase()));
-
-  if (!isAuthorized) {
-    return res.status(403).json({ detail: "Not authorized to respond to this booking request" });
-  }
-
-  if (decision === "accept") {
-    // Check again for conflicting confirmed booking
-    if (hasBookingConflict(booking.item_id, booking.travel_date, booking.time_slot, booking.id)) {
-      return res.status(409).json({
-        detail: `Cannot accept: Another booking is already confirmed for this provider on ${booking.travel_date} (${booking.time_slot}).`,
-        conflict: true,
-      });
-    }
-
-    booking.status = "confirmed";
-    booking.provider_notes = notes || "Booking request accepted! See you in the mountains.";
-    saveDbState();
-    
-    emailNotifications.push({
-      id: nextNotificationId++,
-      recipient_email: booking.traveler_email,
-      recipient_name: booking.traveler_name,
-      subject: `Confirmed! Your booking with ${booking.provider_name} is accepted | #${booking.id}`,
-      email_type: "booking_confirmed_by_provider",
-      booking_id: booking.id,
-      status: "sent",
-      preview: `Voucher #${booking.id} confirmed for ${booking.travel_date}`,
-      created_at: new Date().toISOString(),
-    });
-  } else {
-    booking.status = "declined";
-    booking.provider_notes = notes || "Provider was unavailable on this date.";
-    booking.suggested_date = suggested_date || null;
-    saveDbState();
-
-    emailNotifications.push({
-      id: nextNotificationId++,
-      recipient_email: booking.traveler_email,
-      recipient_name: booking.traveler_name,
-      subject: `Update on your Pahadíly request #${booking.id}`,
-      email_type: "booking_declined",
-      booking_id: booking.id,
-      status: "sent",
-      preview: `Provider declined request #${booking.id}. Notes: ${booking.provider_notes}`,
-      created_at: new Date().toISOString(),
-    });
-  }
-
-  res.json(booking);
+// Traveler Bookings endpoint: Strictly isolated to authenticated user
+app.get("/api/bookings/my", authMiddleware(), (req: AuthenticatedRequest, res) => {
+  const user = req.user!;
+  const userEmail = user.email.toLowerCase();
+  const result = Array.from(bookings.values())
+    .filter((b) => b.user_id === user.id || b.traveler_email.toLowerCase() === userEmail)
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  res.json(result);
 });
 
-// Provider bookings list
+// Provider dispatch requests: Restricted to assigned providers and administrators
 app.get("/api/bookings/provider-requests", authMiddleware(), (req: AuthenticatedRequest, res) => {
-  if (!req.user || !["host", "admin", "guide"].includes(req.user.role)) {
-    return res.status(403).json({ detail: "Provider access required" });
+  const user = req.user!;
+  if (!["host", "admin", "guide"].includes(user.role)) {
+    return res.status(403).json({ detail: "Companion or Host access required." });
   }
-  const user = req.user;
+
   let result = Array.from(bookings.values()).sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
@@ -1504,28 +1486,30 @@ app.get("/api/bookings/provider-requests", authMiddleware(), (req: Authenticated
   res.json(result);
 });
 
-// Busy dates for a local provider
-app.get("/api/locals/:id/busy-dates", (req, res) => {
-  const id = Number(req.params.id);
-  const busySlots: Array<{ date: string; time_slot: string }> = [];
-
-  for (const b of bookings.values()) {
-    if (b.status === "confirmed" && b.item_id === id) {
-      busySlots.push({
-        date: b.travel_date,
-        time_slot: b.time_slot || "full_day",
-      });
-    }
+// All Bookings (Admin Console): Strictly restricted
+app.get("/api/bookings", authMiddleware(), (req: AuthenticatedRequest, res) => {
+  const user = req.user!;
+  if (user.role === "traveler") {
+    return res.status(403).json({
+      detail: "Travelers can only access their own bookings via /api/bookings/my.",
+    });
   }
-  res.json(busySlots);
-});
 
-app.get("/api/bookings", authMiddleware(), (req, res) => {
-  const { status_filter, payment_status, q } = req.query;
   let result = Array.from(bookings.values()).sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
 
+  if (user.role !== "admin") {
+    // Hosts and companions only see bookings assigned to them
+    const uName = user.full_name.toLowerCase();
+    result = result.filter(
+      (b) =>
+        b.provider_id === user.id ||
+        (b.provider_name && b.provider_name.toLowerCase().includes(uName))
+    );
+  }
+
+  const { status_filter, payment_status, q } = req.query;
   if (status_filter && status_filter !== "all") {
     result = result.filter((b) => b.status === status_filter);
   }
@@ -1539,23 +1523,75 @@ app.get("/api/bookings", authMiddleware(), (req, res) => {
         b.traveler_name.toLowerCase().includes(query) ||
         b.traveler_email.toLowerCase().includes(query) ||
         b.item_title.toLowerCase().includes(query) ||
-        (b.provider_name && b.provider_name.toLowerCase().includes(query)) ||
-        (b.payment_id && b.payment_id.toLowerCase().includes(query)) ||
-        (b.transaction_ref && b.transaction_ref.toLowerCase().includes(query))
+        (b.provider_name && b.provider_name.toLowerCase().includes(query))
     );
   }
   res.json(result);
 });
 
-app.get("/api/bookings/my", authMiddleware(), (req: AuthenticatedRequest, res) => {
+// Provider Accept / Decline endpoint with conflict guard
+app.patch("/api/bookings/:id/respond", authMiddleware(), (req: AuthenticatedRequest, res) => {
+  const id = Number(req.params.id);
+  const booking = bookings.get(id);
+  if (!booking) return res.status(404).json({ detail: "Booking request not found" });
+
+  const { decision, notes, suggested_date } = req.body;
+  if (!["accept", "decline"].includes(decision)) {
+    return res.status(400).json({ detail: "Decision must be 'accept' or 'decline'" });
+  }
+
+  // Authorization: Must be admin or the assigned provider
   const user = req.user!;
-  const userEmail = user.email.toLowerCase();
-  const result = Array.from(bookings.values())
-    .filter((b) => b.user_id === user.id || b.traveler_email.toLowerCase() === userEmail)
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  res.json(result);
+  const isAuthorized =
+    user.role === "admin" ||
+    (booking.provider_id && booking.provider_id === user.id) ||
+    (booking.provider_name && user.full_name && booking.provider_name.toLowerCase().includes(user.full_name.toLowerCase())) ||
+    (["host", "guide"].includes(user.role) && booking.provider_name?.toLowerCase().includes(user.full_name.toLowerCase()));
+
+  if (!isAuthorized) {
+    return res.status(403).json({ detail: "Not authorized to respond to this booking request" });
+  }
+
+  if (decision === "accept") {
+    if (hasBookingConflict(booking.item_id, booking.travel_date, booking.time_slot, booking.id)) {
+      return res.status(409).json({
+        detail: `Cannot accept: Another booking is already confirmed for this provider on ${booking.travel_date} (${booking.time_slot}).`,
+        conflict: true,
+      });
+    }
+
+    booking.status = "confirmed";
+    booking.provider_notes = notes || "Booking request accepted! See you in the mountains.";
+    saveDbState();
+
+    dispatchEmailNotification(
+      booking.traveler_email,
+      booking.traveler_name,
+      `Confirmed! Your booking with ${booking.provider_name} is accepted | #${booking.id}`,
+      "booking_confirmed_by_provider",
+      booking.id,
+      `Your booking #${booking.id} has been confirmed by ${booking.provider_name}. Notes: ${booking.provider_notes}`
+    );
+  } else {
+    booking.status = "declined";
+    booking.provider_notes = notes || "Provider was unavailable on this date.";
+    booking.suggested_date = suggested_date || null;
+    saveDbState();
+
+    dispatchEmailNotification(
+      booking.traveler_email,
+      booking.traveler_name,
+      `Update on your Pahadíly request #${booking.id}`,
+      "booking_declined",
+      booking.id,
+      `Provider declined request #${booking.id}. Notes: ${booking.provider_notes}`
+    );
+  }
+
+  res.json(booking);
 });
 
+// Booking status update (Cancellation / Completion)
 app.patch("/api/bookings/:id/status", authMiddleware(), (req: AuthenticatedRequest, res) => {
   const id = Number(req.params.id);
   const booking = bookings.get(id);
@@ -1566,84 +1602,43 @@ app.patch("/api/bookings/:id/status", authMiddleware(), (req: AuthenticatedReque
     return res.status(400).json({ detail: "Invalid status value" });
   }
 
-  if (
-    req.user?.role === "traveler" &&
-    booking.user_id !== req.user.id &&
-    booking.traveler_email.toLowerCase() !== req.user.email.toLowerCase()
-  ) {
-    return res.status(403).json({ detail: "Not authorized to update this booking" });
+  const user = req.user!;
+  // Travelers can only cancel their own bookings
+  if (user.role === "traveler") {
+    const isOwner = booking.user_id === user.id || booking.traveler_email.toLowerCase() === user.email.toLowerCase();
+    if (!isOwner) {
+      return res.status(403).json({ detail: "Not authorized to update another traveler's booking." });
+    }
+    if (newStatus !== "cancelled") {
+      return res.status(403).json({ detail: "Travelers can only cancel their bookings." });
+    }
   }
 
   booking.status = newStatus;
   if (newStatus === "cancelled" && booking.payment_status === "paid") {
     booking.payment_status = "refunded";
   }
+  saveDbState();
   res.json(booking);
-});
-
-app.patch("/api/bookings/:id/payment", authMiddleware(), (req: AuthenticatedRequest, res) => {
-  if (!req.user || !["admin", "host"].includes(req.user.role)) {
-    return res.status(403).json({ detail: "Unauthorized" });
-  }
-  const id = Number(req.params.id);
-  const booking = bookings.get(id);
-  if (!booking) return res.status(404).json({ detail: "Booking not found" });
-
-  const { payment_status, payment_method, transaction_ref } = req.body;
-  if (payment_status) {
-    booking.payment_status = payment_status;
-    if (payment_status === "paid" && booking.status === "pending") {
-      booking.status = "confirmed";
-    } else if (payment_status === "refunded") {
-      booking.status = "cancelled";
-    }
-  }
-  if (payment_method) booking.payment_method = payment_method;
-  if (transaction_ref) booking.transaction_ref = transaction_ref;
-
-  res.json(booking);
-});
-
-app.delete("/api/bookings/:id", authMiddleware(), (req: AuthenticatedRequest, res) => {
-  if (!req.user || !["admin", "host"].includes(req.user.role)) {
-    return res.status(403).json({ detail: "Unauthorized" });
-  }
-  const id = Number(req.params.id);
-  if (!bookings.has(id)) return res.status(404).json({ detail: "Booking not found" });
-  bookings.delete(id);
-  res.json({ message: "Booking removed successfully" });
-});
-
-app.post("/api/bookings/:id/resend-email", authMiddleware(), (req: AuthenticatedRequest, res) => {
-  const id = Number(req.params.id);
-  const booking = bookings.get(id);
-  if (!booking) return res.status(404).json({ detail: "Booking not found" });
-
-  emailNotifications.push({
-    id: nextNotificationId++,
-    recipient_email: booking.traveler_email,
-    recipient_name: booking.traveler_name,
-    subject: `Re-sent: Booking Confirmed: ${booking.item_title} | Pahadíly Voucher #${booking.id}`,
-    email_type: "booking_confirmation",
-    booking_id: booking.id,
-    status: "sent",
-    preview: `Voucher #${booking.id} re-dispatched to ${booking.traveler_email}`,
-    created_at: new Date().toISOString(),
-  });
-
-  res.json({ message: `Confirmation voucher sent to ${booking.traveler_email}` });
 });
 
 // --- Host Applications Endpoints ---
 app.post("/api/host-applications", authMiddleware(true), (req: AuthenticatedRequest, res) => {
   const body = req.body;
+  const name = String(body.name || req.user?.full_name || "").trim();
+  const region = String(body.region || "Himachal").trim();
+  const skill = String(body.skill || "Host").trim();
+
+  if (!name) return res.status(400).json({ detail: "Applicant name is required." });
+  if (!region) return res.status(400).json({ detail: "Region is required." });
+
   const newApp: HostApplication = {
     id: nextHostAppId++,
-    name: body.name,
+    name,
     email: (body.email || req.user?.email || null)?.toLowerCase(),
     phone: body.phone || req.user?.phone || null,
-    region: body.region || "Himachal",
-    skill: body.skill || "Host",
+    region,
+    skill,
     bio: body.bio || null,
     languages: body.languages || null,
     avatar: body.avatar || null,
@@ -1669,24 +1664,26 @@ app.post("/api/host-applications", authMiddleware(true), (req: AuthenticatedRequ
 
   hostApplications.set(newApp.id, newApp);
   saveDbState();
+
   res.status(201).json({
     id: newApp.id,
     status: newApp.status,
-    message:
-      "Host & Location details submitted successfully! Your listing is now pending administrator review.",
+    message: "Application submitted successfully! Your listing is pending administrator review.",
     application: newApp,
   });
 });
 
 app.get("/api/host-applications", authMiddleware(), (req: AuthenticatedRequest, res) => {
+  const user = req.user!;
   let result = Array.from(hostApplications.values()).sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
 
-  if (req.user?.role !== "admin") {
-    const userEmail = req.user?.email?.toLowerCase();
+  if (user.role !== "admin") {
+    // Non-admin only sees their own applications
+    const userEmail = user.email?.toLowerCase();
     result = result.filter(
-      (a) => a.user_id === req.user?.id || (a.email && a.email.toLowerCase() === userEmail)
+      (a) => a.user_id === user.id || (a.email && a.email.toLowerCase() === userEmail)
     );
   }
   res.json(result);
@@ -1701,19 +1698,20 @@ app.get("/api/host-applications/my-submissions", authMiddleware(), (req: Authent
   res.json(result);
 });
 
+// Status change: Strictly restricted to administrators
 app.patch("/api/host-applications/:id/status", authMiddleware(), (req: AuthenticatedRequest, res) => {
   if (req.user?.role !== "admin") {
-    return res
-      .status(403)
-      .json({ detail: "Administrator privileges required to review host applications." });
+    return res.status(403).json({
+      detail: "Administrator privileges required to review and approve host applications.",
+    });
   }
   const id = Number(req.params.id);
   const appObj = hostApplications.get(id);
   if (!appObj) return res.status(404).json({ detail: "Application not found" });
 
-  const statusVal = (req.query.status_val || req.body.status_val) as "pending" | "approved" | "rejected";
+  const statusVal = (req.query.status_val || req.body.status_val || req.body.status) as "pending" | "approved" | "rejected";
   if (!["pending", "approved", "rejected"].includes(statusVal)) {
-    return res.status(400).json({ detail: "Invalid status value" });
+    return res.status(400).json({ detail: "Status must be 'pending', 'approved', or 'rejected'" });
   }
 
   appObj.status = statusVal;
@@ -1724,7 +1722,7 @@ app.patch("/api/host-applications/:id/status", authMiddleware(), (req: Authentic
   let publishedId = appObj.published_place_id;
 
   if (statusVal === "approved") {
-    // 1. Upgrade user account to host
+    // 1. Upgrade user account to host/guide
     let targetUser: User | undefined;
     if (appObj.user_id) targetUser = users.get(appObj.user_id);
     if (!targetUser && appObj.email) {
@@ -1737,7 +1735,7 @@ app.patch("/api/host-applications/:id/status", authMiddleware(), (req: Authentic
       targetUser.is_verified = true;
     }
 
-    // 2. Publish as live Place if property_name exists
+    // 2. Publish as live Place if property details were provided
     if (appObj.property_name && !appObj.published_place_id) {
       const tagsList = (appObj.tags || "Mountain Sanctuary, Handcrafted, Local Meals")
         .split(",")
@@ -1757,9 +1755,7 @@ app.patch("/api/host-applications/:id/status", authMiddleware(), (req: Authentic
         altitude: appObj.altitude || "1,800m",
         tags: tagsList,
         image: appObj.image || "/images/destinations/tirthan-valley.jpg",
-        description:
-          appObj.description ||
-          `Welcome to ${appObj.property_name}. Experience the Himalayas with local host ${appObj.name}.`,
+        description: appObj.description || `Welcome to ${appObj.property_name}. Experience the Himalayas with local host ${appObj.name}.`,
         host_name: appObj.name,
         latitude: appObj.latitude,
         longitude: appObj.longitude,
@@ -1779,24 +1775,12 @@ app.patch("/api/host-applications/:id/status", authMiddleware(), (req: Authentic
     id: appObj.id,
     status: appObj.status,
     published_place_id: publishedId,
-    message:
-      `Host application marked as ${statusVal}` +
-      (publishedId && statusVal === "approved" ? ` and published as Place #${publishedId}!` : "."),
+    message: `Host application marked as ${statusVal}${publishedId && statusVal === "approved" ? ` and published as Place #${publishedId}!` : "."}`,
     application: appObj,
   });
 });
 
-app.delete("/api/host-applications/:id", authMiddleware(), (req: AuthenticatedRequest, res) => {
-  if (req.user?.role !== "admin") {
-    return res.status(403).json({ detail: "Unauthorized" });
-  }
-  const id = Number(req.params.id);
-  if (!hostApplications.has(id)) return res.status(404).json({ detail: "Application not found" });
-  hostApplications.delete(id);
-  res.json({ message: "Host application deleted successfully" });
-});
-
-// --- Notifications Audit Endpoints ---
+// Notifications audit log: Admin or user-filtered
 app.get("/api/notifications", authMiddleware(), (req: AuthenticatedRequest, res) => {
   let result = [...emailNotifications].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -1808,18 +1792,41 @@ app.get("/api/notifications", authMiddleware(), (req: AuthenticatedRequest, res)
   res.json(result);
 });
 
-// --- API Root Endpoint ---
+// API Root info
 app.get("/api", (_req, res) => {
   res.json({
     name: "Pahadíly API",
-    version: "1.0.0",
+    version: "2.0.0",
     status: "online",
+    active_storage: activeStorageType,
     tagline: "Rare Places. Real People. Lasting Stories.",
   });
 });
 
+// Sitemap & Robots
+app.get("/robots.txt", (_req, res) => {
+  const robotsPath = path.resolve(__dirname, "public", "robots.txt");
+  if (fs.existsSync(robotsPath)) {
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    return res.sendFile(robotsPath);
+  }
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
+  res.send("User-agent: *\nAllow: /\nSitemap: https://pahadily.com/sitemap.xml\n");
+});
+
+app.get("/sitemap.xml", (_req, res) => {
+  const sitemapPath = path.resolve(__dirname, "public", "sitemap.xml");
+  if (fs.existsSync(sitemapPath)) {
+    res.setHeader("Content-Type", "application/xml; charset=utf-8");
+    return res.sendFile(sitemapPath);
+  }
+  res.status(404).send("Sitemap not found");
+});
+
 // --- Frontend Mounting (Vite in Dev Mode or Static in Prod) ---
 async function startServer() {
+  await initDatabase();
+
   const isProduction = process.env.NODE_ENV === "production";
   const distPath = path.resolve(__dirname, "dist");
   const hasDist = fs.existsSync(path.join(distPath, "index.html"));
@@ -1843,7 +1850,7 @@ async function startServer() {
     });
     app.use(vite.middlewares);
 
-    // Fallback for SPA routing in development mode (Express 5 compatible)
+    // Fallback for SPA routing in development mode
     app.use(async (req, res, next) => {
       const url = req.originalUrl;
       if (url.startsWith("/api/")) {
@@ -1862,14 +1869,14 @@ async function startServer() {
   }
 
   const server = app.listen(PORT, HOST, () => {
-    console.log(`Pahadíly full-stack server running on http://${HOST}:${PORT}`);
+    console.log(`[Pahadíly] Server running on http://${HOST}:${PORT} (Storage: ${activeStorageType})`);
   });
 
   server.on("error", (err: any) => {
     if (err.code === "EADDRINUSE") {
-      console.warn(`Port ${PORT} in use, retrying or letting supervisor reconnect...`);
+      console.warn(`[Pahadíly] Port ${PORT} in use, retrying or supervisor will handle.`);
     } else {
-      console.error("Server listen error:", err);
+      console.error("[Pahadíly] Server listen error:", err);
     }
   });
 }

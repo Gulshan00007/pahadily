@@ -414,8 +414,14 @@ export async function getMyHostSubmissions() {
 }
 
 export async function updateHostApplicationStatus(id, statusVal, adminNotes = null) {
-  const notesParam = adminNotes ? `&admin_notes=${encodeURIComponent(adminNotes)}` : "";
-  const response = await fetch(`${API_BASE_URL}/api/host-applications/${id}/status?status_val=${statusVal}${notesParam}`, {
+  let sVal = statusVal;
+  let notes = adminNotes;
+  if (typeof statusVal === 'object' && statusVal !== null) {
+    sVal = statusVal.status_val || statusVal.status;
+    notes = statusVal.admin_notes ?? notes;
+  }
+  const notesParam = notes ? `&admin_notes=${encodeURIComponent(notes)}` : "";
+  const response = await fetch(`${API_BASE_URL}/api/host-applications/${id}/status?status_val=${encodeURIComponent(sVal)}${notesParam}`, {
     method: "PATCH",
     headers: getAuthHeaders(),
   });

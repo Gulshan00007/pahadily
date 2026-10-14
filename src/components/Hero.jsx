@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const PILOT_VALLEYS = [
   {
@@ -34,6 +35,7 @@ const PILOT_VALLEYS = [
 ];
 
 function Hero() {
+  const navigate = useNavigate();
   const [searchValue, setSearchValue] = useState('');
   const [activeModal, setActiveModal] = useState(null);
 
@@ -41,39 +43,15 @@ function Hero() {
     e.preventDefault();
     const query = searchValue.trim();
     if (query) {
-      const matched = PILOT_VALLEYS.find(
-        (v) =>
-          v.name.toLowerCase().includes(query.toLowerCase()) ||
-          v.highlights.toLowerCase().includes(query.toLowerCase())
-      );
-      setActiveModal({
-        type: 'search',
-        query,
-        matchedValley: matched || PILOT_VALLEYS[0],
-      });
+      navigate(`/explore?q=${encodeURIComponent(query)}`);
     } else {
-      setActiveModal({
-        type: 'explore',
-        title: 'Explore Pilot Valleys in Kullu District',
-      });
+      navigate('/explore');
     }
   };
 
   const openValley = (valleyName) => {
-    const val = PILOT_VALLEYS.find((v) => v.name.toLowerCase().includes(valleyName.toLowerCase()));
-    if (val) {
-      setActiveModal({
-        type: 'valley',
-        valley: val,
-      });
-    }
-  };
-
-  const openCompanions = () => {
-    setActiveModal({
-      type: 'companions',
-      title: 'Local Companions & Mountain Guides',
-    });
+    const slug = valleyName.toLowerCase().replace(/\s+/g, '-');
+    navigate(`/explore?valley=${encodeURIComponent(slug)}`);
   };
 
   return (
@@ -164,66 +142,7 @@ function Hero() {
             </button>
           </form>
 
-          {/* Primary & Secondary Call to Actions */}
-          <div
-            style={{
-              display: 'flex',
-              gap: '14px',
-              flexWrap: 'wrap',
-              marginBottom: '28px',
-            }}
-          >
-            <button
-              type="button"
-              onClick={() =>
-                setActiveModal({
-                  type: 'explore',
-                  title: 'Explore Pilot Valleys in Kullu District',
-                })
-              }
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '13px 26px',
-                borderRadius: '9999px',
-                backgroundColor: 'var(--color-forest-medium, #143d2d)',
-                color: '#ffffff',
-                fontWeight: 700,
-                fontSize: '15px',
-                boxShadow: 'var(--shadow-md)',
-                cursor: 'pointer',
-                border: 'none',
-                transition: 'all 0.2s ease',
-              }}
-            >
-              <span>Explore Places</span>
-              <span>→</span>
-            </button>
 
-            <button
-              type="button"
-              onClick={openCompanions}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '13px 24px',
-                borderRadius: '9999px',
-                backgroundColor: 'rgba(255, 255, 255, 0.18)',
-                backdropFilter: 'blur(8px)',
-                WebkitBackdropFilter: 'blur(8px)',
-                color: '#ffffff',
-                fontWeight: 600,
-                fontSize: '15px',
-                border: '1.5px solid rgba(255, 255, 255, 0.4)',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-              }}
-            >
-              <span>🤝 Find a Local Companion</span>
-            </button>
-          </div>
 
           {/* Quick Valley Discovery Pills */}
           <div

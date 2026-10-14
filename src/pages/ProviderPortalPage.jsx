@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { getProviderRequests, respondToBooking } from '../lib/api';
 
 export default function ProviderPortalPage() {
-  const { user, isHost, demoLogin, showToast, refreshKey, triggerRefresh } = useAuth();
+  const { user, isHost, showToast, refreshKey, triggerRefresh } = useAuth();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeRespondingId, setActiveRespondingId] = useState(null);
@@ -69,6 +69,27 @@ export default function ProviderPortalPage() {
     return r.status === filter;
   });
 
+  if (!user || (!isHost && user?.role !== 'admin')) {
+    return (
+      <div style={{ backgroundColor: '#F7F5EE', minHeight: 'calc(100vh - 76px)', padding: '60px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ maxWidth: '520px', width: '100%', backgroundColor: '#FFFFFF', borderRadius: '20px', padding: '36px', textAlign: 'center', border: '1px solid rgba(16, 37, 29, 0.1)', boxShadow: '0 8px 30px rgba(16, 37, 29, 0.06)' }}>
+          <div style={{ fontSize: '42px', marginBottom: '14px' }}>🌲</div>
+          <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: '24px', color: '#10251D', marginBottom: '10px' }}>
+            Provider Access Restricted
+          </h2>
+          <p style={{ fontSize: '14.5px', color: '#536B5E', lineHeight: 1.55, marginBottom: '24px' }}>
+            The Companion & Host Dashboard requires an approved local provider account. If you are a native valley resident offering homestays or guiding, please submit an application for administrator review.
+          </p>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+            <a href="/become-a-local" style={{ padding: '10px 22px', borderRadius: '9999px', backgroundColor: '#174D39', color: '#FFFFFF', fontSize: '13.5px', fontWeight: 700, textDecoration: 'none' }}>
+              Apply to Become a Local
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ backgroundColor: '#F7F5EE', minHeight: 'calc(100vh - 76px)', paddingBottom: '80px' }}>
       {/* Header Banner */}
@@ -86,25 +107,6 @@ export default function ProviderPortalPage() {
                 Manage incoming traveler requests for guiding, homestays, and experiences.
               </p>
             </div>
-
-            {!isHost && (
-              <button
-                type="button"
-                onClick={() => demoLogin('host')}
-                style={{
-                  padding: '8px 18px',
-                  borderRadius: '9999px',
-                  backgroundColor: '#8EE49A',
-                  color: '#10251D',
-                  fontSize: '13px',
-                  fontWeight: 700,
-                  border: 'none',
-                  cursor: 'pointer',
-                }}
-              >
-                ⚡ Switch to Demo Host Account
-              </button>
-            )}
           </div>
         </div>
       </section>
