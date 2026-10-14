@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef } from 'react';
 
 // Geographically accurate projections for Himachal Pradesh and its core sanctuaries
 // Core sanctuary bounding box (Central Himachal Pradesh: Kullu, Parvati, Tirthan, Sainj, Upper Beas):
@@ -39,24 +39,24 @@ function projectHimachalState(lat, lon) {
 
 // Cluster color scheme
 const CLUSTER_COLORS = {
-  tirthan: { bg: "#1b4d3e", text: "#e8f5ed", border: "#2f725a", glow: "rgba(27, 77, 62, 0.45)" },
-  jibhi: { bg: "#255c47", text: "#e8f5ed", border: "#398065", glow: "rgba(37, 92, 71, 0.45)" },
-  shangarh: { bg: "#2d6a4f", text: "#ecfdf5", border: "#40916c", glow: "rgba(45, 106, 79, 0.45)" },
-  kalga: { bg: "#b45309", text: "#fef3c7", border: "#d97706", glow: "rgba(180, 83, 9, 0.45)" },
-  chalal: { bg: "#9a3412", text: "#ffedd5", border: "#c2410c", glow: "rgba(154, 52, 18, 0.45)" },
-  waichin: { bg: "#854d0e", text: "#fef9c3", border: "#a16207", glow: "rgba(133, 77, 14, 0.45)" },
-  naggar: { bg: "#6b21a8", text: "#f3e8ff", border: "#8b5cf6", glow: "rgba(107, 33, 168, 0.45)" },
-  "lug-valley": { bg: "#155e75", text: "#ecfeff", border: "#0891b2", glow: "rgba(21, 94, 117, 0.45)" },
+  tirthan: { bg: '#174D39', text: '#e8f5ed', border: '#2f725a', glow: 'rgba(23, 77, 57, 0.45)' },
+  jibhi: { bg: '#255c47', text: '#e8f5ed', border: '#398065', glow: 'rgba(37, 92, 71, 0.45)' },
+  shangarh: { bg: '#2d6a4f', text: '#ecfdf5', border: '#40916c', glow: 'rgba(45, 106, 79, 0.45)' },
+  kalga: { bg: '#b45309', text: '#fef3c7', border: '#d97706', glow: 'rgba(180, 83, 9, 0.45)' },
+  chalal: { bg: '#9a3412', text: '#ffedd5', border: '#c2410c', glow: 'rgba(154, 52, 18, 0.45)' },
+  waichin: { bg: '#854d0e', text: '#fef9c3', border: '#a16207', glow: 'rgba(133, 77, 14, 0.45)' },
+  naggar: { bg: '#6b21a8', text: '#f3e8ff', border: '#8b5cf6', glow: 'rgba(107, 33, 168, 0.45)' },
+  'lug-valley': { bg: '#155e75', text: '#ecfeff', border: '#0891b2', glow: 'rgba(21, 94, 117, 0.45)' },
 };
 
 function getClusterColor(id) {
-  return CLUSTER_COLORS[id] || { bg: "#1e4635", text: "#eaf3ee", border: "#2d6b53", glow: "rgba(30, 70, 53, 0.4)" };
+  return CLUSTER_COLORS[id] || { bg: '#10251D', text: '#eaf3ee', border: '#2d6b53', glow: 'rgba(16, 37, 29, 0.4)' };
 }
 
-function ExploreInteractiveMap({
+export default function ExploreInteractiveMap({
   destinations = [],
   allDestinationsCount = 8,
-  activeValleyId = "all",
+  activeValleyId = 'all',
   onSelectValley,
   onBookFlagshipStay,
   selectedLocationId,
@@ -64,15 +64,15 @@ function ExploreInteractiveMap({
   hoveredPlaceId,
   onHoverPlace,
   isSplitView = false,
-  className = "",
+  className = '',
   onToggleFullscreen,
 }) {
-  const [mapScope, setMapScope] = useState("valley-topo"); // "valley-topo" | "himachal-wide"
+  const [mapScope, setMapScope] = useState('valley-topo'); // "valley-topo" | "himachal-wide"
   const [zoomLevel, setZoomLevel] = useState(1);
   const [activePinId, setActivePinId] = useState(selectedLocationId || null);
   const [userGps, setUserGps] = useState(null);
   const [isLocating, setIsLocating] = useState(false);
-  const [filterElevation, setFilterElevation] = useState("all"); // "all" | "low" (<2000m) | "high" (>=2000m)
+  const [filterElevation, setFilterElevation] = useState('all'); // "all" | "low" (<2000m) | "high" (>=2000m)
   const mapContainerRef = useRef(null);
 
   // Sync external selected ID
@@ -82,49 +82,44 @@ function ExploreInteractiveMap({
     }
   }, [selectedLocationId]);
 
-  // Sync hovered destination from outside
-  useEffect(() => {
-    if (hoveredPlaceId && !activePinId) {
-      // transient highlight without locking popup
-    }
-  }, [hoveredPlaceId, activePinId]);
-
   // Handle elevation filter
   const displayedDestinations = useMemo(() => {
-    if (filterElevation === "all") return destinations;
+    if (filterElevation === 'all') return destinations;
     return destinations.filter((d) => {
-      const match = (d.elevation || "").match(/[\d,]+/);
-      const elev = match ? parseInt(match[0].replace(/,/g, ""), 10) : 2000;
-      if (filterElevation === "low") return elev < 2000;
-      if (filterElevation === "high") return elev >= 2000;
+      const match = (d.elevation || '').match(/[\d,]+/);
+      const elev = match ? parseInt(match[0].replace(/,/g, ''), 10) : 2000;
+      if (filterElevation === 'low') return elev < 2000;
+      if (filterElevation === 'high') return elev >= 2000;
       return true;
     });
   }, [destinations, filterElevation]);
 
   // Projected pins
   const mappedPins = useMemo(() => {
-    return displayedDestinations.map((d) => {
-      const coords =
-        mapScope === "valley-topo"
-          ? projectSanctuaryValley(d.latitude, d.longitude)
-          : projectHimachalState(d.latitude, d.longitude);
+    return displayedDestinations
+      .map((d) => {
+        const coords =
+          mapScope === 'valley-topo'
+            ? projectSanctuaryValley(d.latitude, d.longitude)
+            : projectHimachalState(d.latitude, d.longitude);
 
-      if (!coords) return null;
-      const theme = getClusterColor(d.id);
-      const minPrice = d.stays?.length
-        ? Math.min(...d.stays.map((s) => s.priceNum || 2000))
-        : 1800;
+        if (!coords) return null;
+        const theme = getClusterColor(d.id);
+        const minPrice = d.stays?.length
+          ? Math.min(...d.stays.map((s) => s.priceNum || 2000))
+          : 1800;
 
-      return {
-        ...d,
-        x: coords.x,
-        y: coords.y,
-        theme,
-        minPrice,
-        staysCount: d.stays?.length || 0,
-        attractionsCount: d.nearbyAttractions?.length || 0,
-      };
-    }).filter(Boolean);
+        return {
+          ...d,
+          x: coords.x,
+          y: coords.y,
+          theme,
+          minPrice,
+          staysCount: d.stays?.length || 0,
+          attractionsCount: d.nearbyAttractions?.length || 0,
+        };
+      })
+      .filter(Boolean);
   }, [displayedDestinations, mapScope]);
 
   // Selected destination object for the floating preview card
@@ -163,20 +158,19 @@ function ExploreInteractiveMap({
       return;
     }
     setIsLocating(true);
-    if ("geolocation" in navigator) {
+    if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const lat = pos.coords.latitude;
           const lon = pos.coords.longitude;
           const coords =
-            mapScope === "valley-topo"
+            mapScope === 'valley-topo'
               ? projectSanctuaryValley(lat, lon)
               : projectHimachalState(lat, lon);
           setUserGps(coords || { x: 50, y: 50 });
           setIsLocating(false);
         },
         () => {
-          // Fallback to central Himachal Pradesh (Mandi / Kullu gateway)
           setUserGps({ x: 48, y: 56 });
           setIsLocating(false);
         },
@@ -190,7 +184,7 @@ function ExploreInteractiveMap({
 
   return (
     <div
-      className={`himalaya-interactive-map-root ${isSplitView ? "is-split-mode" : ""} ${className}`}
+      className={`himalaya-interactive-map-root ${isSplitView ? 'is-split-mode' : ''} ${className}`}
       ref={mapContainerRef}
     >
       {/* Top Map Action Toolbar */}
@@ -207,16 +201,16 @@ function ExploreInteractiveMap({
           <div className="map-scope-switch" role="group" aria-label="Map spatial projection">
             <button
               type="button"
-              className={`scope-switch-btn ${mapScope === "valley-topo" ? "active" : ""}`}
-              onClick={() => setMapScope("valley-topo")}
+              className={`scope-switch-btn ${mapScope === 'valley-topo' ? 'active' : ''}`}
+              onClick={() => setMapScope('valley-topo')}
               title="Zoom to Central Valley Sanctuaries (Kullu, Parvati, Tirthan, Sainj)"
             >
               <span>🌲 Central Valleys Topo</span>
             </button>
             <button
               type="button"
-              className={`scope-switch-btn ${mapScope === "himachal-wide" ? "active" : ""}`}
-              onClick={() => setMapScope("himachal-wide")}
+              className={`scope-switch-btn ${mapScope === 'himachal-wide' ? 'active' : ''}`}
+              onClick={() => setMapScope('himachal-wide')}
               title="Overview of Himachal Pradesh state boundaries"
             >
               <span>🏔️ All Himachal Overview</span>
@@ -230,23 +224,23 @@ function ExploreInteractiveMap({
             <span className="elev-filter-label">Altitude:</span>
             <button
               type="button"
-              className={`elev-chip-btn ${filterElevation === "all" ? "active" : ""}`}
-              onClick={() => setFilterElevation("all")}
+              className={`elev-chip-btn ${filterElevation === 'all' ? 'active' : ''}`}
+              onClick={() => setFilterElevation('all')}
             >
               All
             </button>
             <button
               type="button"
-              className={`elev-chip-btn ${filterElevation === "low" ? "active" : ""}`}
-              onClick={() => setFilterElevation("low")}
+              className={`elev-chip-btn ${filterElevation === 'low' ? 'active' : ''}`}
+              onClick={() => setFilterElevation('low')}
               title="Sanctuaries under 2,000m (Tirthan, Jibhi, Chalal, Lug)"
             >
               &lt; 2,000m
             </button>
             <button
               type="button"
-              className={`elev-chip-btn ${filterElevation === "high" ? "active" : ""}`}
-              onClick={() => setFilterElevation("high")}
+              className={`elev-chip-btn ${filterElevation === 'high' ? 'active' : ''}`}
+              onClick={() => setFilterElevation('high')}
               title="Alpine Sanctuaries above 2,000m (Kalga, Shangarh, Waichin, Naggar)"
             >
               ≥ 2,000m
@@ -279,8 +273,8 @@ function ExploreInteractiveMap({
           className="map-scalable-canvas"
           style={{
             transform: `scale(${zoomLevel})`,
-            transformOrigin: "center center",
-            transition: "transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)",
+            transformOrigin: 'center center',
+            transition: 'transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
           }}
         >
           {/* SVG Topographic Artboard */}
@@ -321,7 +315,6 @@ function ExploreInteractiveMap({
               <rect width="1000" height="700" fill="url(#hpTopoBase)" />
 
               {/* Shaded Relief Mountain Ranges (Pir Panjal & Great Himalayan Crests) */}
-              {/* North / North-East High Glaciers */}
               <polygon points="620,0 780,110 520,110" fill="url(#snowPeakGrad)" />
               <polygon points="740,0 890,95 650,95" fill="url(#snowPeakGrad)" />
               <polygon points="850,0 1000,80 780,80" fill="url(#snowPeakGrad)" />
@@ -348,7 +341,6 @@ function ExploreInteractiveMap({
               </g>
 
               {/* Glacial River Courses */}
-              {/* Beas River Corridor (Rohtang -> Naggar -> Kullu -> Bhuntar -> Aut) */}
               <g fill="none" strokeLinecap="round" strokeLinejoin="round">
                 {/* Beas River */}
                 <path
@@ -364,7 +356,7 @@ function ExploreInteractiveMap({
                   opacity="0.9"
                 />
 
-                {/* Parvati River (Mantalai / Khirganga -> Kalga -> Chalal -> Bhuntar junction) */}
+                {/* Parvati River */}
                 <path
                   d="M 870,260 Q 800,250 710,240 T 570,250 T 430,270 T 380,290"
                   stroke="#0284c7"
@@ -378,15 +370,7 @@ function ExploreInteractiveMap({
                   opacity="0.9"
                 />
 
-                {/* Malana & Waichin Stream (joining Parvati) */}
-                <path
-                  d="M 570,160 Q 560,200 550,230 T 520,255"
-                  stroke="#0ea5e9"
-                  strokeWidth="2.6"
-                  opacity="0.7"
-                />
-
-                {/* Sainj River (Shangarh meadows -> Larji Dam reservoir) */}
+                {/* Sainj River */}
                 <path
                   d="M 720,490 Q 640,480 560,475 T 460,470"
                   stroke="#0284c7"
@@ -394,7 +378,7 @@ function ExploreInteractiveMap({
                   opacity="0.7"
                 />
 
-                {/* Tirthan River (GHNP glacier springs -> Gushaini -> Banjar -> Larji) */}
+                {/* Tirthan River */}
                 <path
                   d="M 820,570 Q 740,560 660,550 T 540,520 T 460,480"
                   stroke="#0369a1"
@@ -408,7 +392,7 @@ function ExploreInteractiveMap({
                   opacity="0.9"
                 />
 
-                {/* Sarwari Stream (Lug Valley -> Beas junction at Kullu) */}
+                {/* Sarwari Stream */}
                 <path
                   d="M 180,270 Q 250,275 310,280 T 370,285"
                   stroke="#0ea5e9"
@@ -446,14 +430,6 @@ function ExploreInteractiveMap({
                 JALORI PASS (3,120M) &amp; SHIMLA HIGHWAY
               </text>
 
-              <text x="40" y="660" fill="rgba(12, 42, 29, 0.28)" fontSize="11" fontWeight="700" fontFamily="sans-serif" letterSpacing="1">
-                Mandi &amp; Kangra Valley Border
-              </text>
-
-              <text x="960" y="90" fill="rgba(12, 42, 29, 0.35)" fontSize="11" fontWeight="800" fontFamily="sans-serif" letterSpacing="2" textAnchor="end">
-                Lahaul &amp; Spiti High Plateau
-              </text>
-
               {/* River water name badges */}
               <text x="410" y="240" fill="#1e40af" fontSize="9.5" fontWeight="700" fontFamily="sans-serif" opacity="0.6">
                 Beas River ➔
@@ -489,13 +465,13 @@ function ExploreInteractiveMap({
             return (
               <div
                 key={dest.id}
-                className={`himalaya-map-pin ${isSelected ? "is-selected" : ""} ${isHovered ? "is-hovered" : ""} ${isActiveValley ? "is-active-valley" : ""}`}
+                className={`himalaya-map-pin ${isSelected ? 'is-selected' : ''} ${isHovered ? 'is-hovered' : ''} ${isActiveValley ? 'is-active-valley' : ''}`}
                 style={{
                   left: `${dest.x}%`,
                   top: `${dest.y}%`,
-                  "--pin-bg": dest.theme.bg,
-                  "--pin-border": dest.theme.border,
-                  "--pin-glow": dest.theme.glow,
+                  '--pin-bg': dest.theme.bg,
+                  '--pin-border': dest.theme.border,
+                  '--pin-glow': dest.theme.glow,
                 }}
                 onClick={(e) => handlePinClick(dest.id, e)}
                 onMouseEnter={() => onHoverPlace && onHoverPlace(dest.id)}
@@ -517,27 +493,27 @@ function ExploreInteractiveMap({
                 {/* Marker Body with Icon */}
                 <div className="pin-marker-head">
                   <span className="pin-icon">
-                    {dest.id === "naggar" ? "🏰" :
-                     dest.id === "tirthan" ? "🐟" :
-                     dest.id === "jibhi" ? "🌲" :
-                     dest.id === "shangarh" ? "🌿" :
-                     dest.id === "kalga" ? "🍎" :
-                     dest.id === "chalal" ? "🪵" :
-                     dest.id === "waichin" ? "✨" : "⛰️"}
+                    {dest.id === 'naggar' ? '🏰' :
+                     dest.id === 'tirthan' ? '🐟' :
+                     dest.id === 'jibhi' ? '🌲' :
+                     dest.id === 'shangarh' ? '🌿' :
+                     dest.id === 'kalga' ? '🍎' :
+                     dest.id === 'chalal' ? '🪵' :
+                     dest.id === 'waichin' ? '✨' : '⛰️'}
                   </span>
                 </div>
 
                 {/* Name Label with Starting Price */}
                 <div className="pin-name-card">
-                  <span className="pin-title">{dest.name.split(" ")[0]}</span>
-                  <span className="pin-price">From ₹{dest.minPrice.toLocaleString("en-IN")}</span>
+                  <span className="pin-title">{dest.name.split(' ')[0]}</span>
+                  <span className="pin-price">From ₹{dest.minPrice.toLocaleString('en-IN')}</span>
                 </div>
               </div>
             );
           })}
         </div>
 
-        {/* Floating Destination Popover Card (When a pin is selected or hovered) */}
+        {/* Floating Destination Popover Card */}
         {selectedPin && (
           <div
             className="map-floating-sanctuary-card"
@@ -560,22 +536,19 @@ function ExploreInteractiveMap({
             <div className="map-card-content-grid">
               <div className="map-card-img-wrap">
                 <img
-                  src={selectedPin.images?.[0] || selectedPin.image || "/images/destinations/tirthan-valley.jpg"}
+                  src={selectedPin.images?.[0] || selectedPin.image || 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=600&q=80'}
                   alt={selectedPin.name}
                   className="map-card-img"
                   loading="lazy"
-                  onError={(e) => {
-                    e.currentTarget.src = "/images/destinations/tirthan-valley.jpg";
-                  }}
                 />
                 <span className="map-card-elev-tag">⛰️ {selectedPin.elevation}</span>
-                <span className="map-card-badge-tag">{selectedPin.badge || "Sanctuary"}</span>
+                <span className="map-card-badge-tag">{selectedPin.badge || 'Sanctuary'}</span>
               </div>
 
               <div className="map-card-info">
                 <div className="map-card-meta-top">
                   <span className="map-card-district">
-                    📍 {selectedPin.subValley || "Kullu District"}
+                    📍 {selectedPin.subValley || 'Kullu District'}
                   </span>
                   <span className="map-card-time">🗓️ {selectedPin.bestTime}</span>
                 </div>
@@ -595,7 +568,7 @@ function ExploreInteractiveMap({
                   </div>
                   <div className="map-card-stat">
                     <span className="stat-num">
-                      ₹{(selectedPin.stays?.[0]?.priceNum || 2000).toLocaleString("en-IN")}
+                      ₹{(selectedPin.stays?.[0]?.priceNum || 2000).toLocaleString('en-IN')}
                     </span>
                     <span className="stat-label">Starting / night</span>
                   </div>
@@ -664,9 +637,9 @@ function ExploreInteractiveMap({
           )}
           <button
             type="button"
-            className={`map-ctrl-btn ${userGps ? "active" : ""}`}
+            className={`map-ctrl-btn ${userGps ? 'active' : ''}`}
             onClick={handleLocateUser}
-            title={userGps ? "Location Active" : "Find My Location"}
+            title={userGps ? 'Location Active' : 'Find My Location'}
             aria-label="Locate me on map"
             disabled={isLocating}
           >
@@ -680,19 +653,19 @@ function ExploreInteractiveMap({
         {/* Bottom Topographic Legend */}
         <div className="map-legend-strip">
           <div className="legend-item">
-            <span className="legend-dot" style={{ background: "#2563eb" }} />
+            <span className="legend-dot" style={{ background: '#2563eb' }} />
             <span>Glacial Rivers (Beas, Parvati, Tirthan)</span>
           </div>
           <div className="legend-item">
-            <span className="legend-dot" style={{ background: "#1b4d3e" }} />
+            <span className="legend-dot" style={{ background: '#174D39' }} />
             <span>Cedar Valleys</span>
           </div>
           <div className="legend-item">
-            <span className="legend-dot" style={{ background: "#b45309" }} />
+            <span className="legend-dot" style={{ background: '#b45309' }} />
             <span>Alpine Backcountry</span>
           </div>
           <div className="legend-item">
-            <span className="legend-dot" style={{ background: "#6b21a8" }} />
+            <span className="legend-dot" style={{ background: '#6b21a8' }} />
             <span>Kath-Kuni Heritage</span>
           </div>
         </div>
@@ -700,5 +673,3 @@ function ExploreInteractiveMap({
     </div>
   );
 }
-
-export default ExploreInteractiveMap;

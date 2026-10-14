@@ -122,24 +122,26 @@ function BookingModal() {
         item_id: Number(item.id) || 1,
         item_title: itemTitle,
         item_image: itemImage,
-        traveler_name: travelerName,
-        traveler_email: travelerEmail,
-        traveler_phone: travelerPhone || null,
+        provider_name: item.guide || item.host_name || item.name || itemTitle,
+        traveler_name: travelerName || user?.full_name || "Mountain Traveler",
+        traveler_email: travelerEmail || user?.email || "traveler@pahadily.com",
+        traveler_phone: travelerPhone || user?.phone || null,
         travel_date: travelDate,
-        end_date: bookingType === "place" && endDate ? endDate : null,
+        end_date: endDate || null,
+        time_slot: "full_day",
         guests: `${guests} Guest(s)`,
         nights: nightsCount,
         total_price: formattedTotal,
-        payment_method: paymentMethod,
-        payment_status: paymentMethod === "cash_on_arrival" ? "pending" : "paid",
+        payment_method: "direct_on_meetup",
+        payment_status: "pending",
         message: message || "Looking forward to this authentic Himalayan journey.",
       };
 
       const result = await createBooking(payload);
       setBookingSuccess(result);
-      showToast(`Reservation for "${itemTitle}" confirmed successfully!`);
+      showToast(`Booking request for "${itemTitle}" sent to host!`);
     } catch (err) {
-      setError(err.message || "Failed to submit booking. Please try again.");
+      setError(err.message || "Failed to submit booking request. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -172,11 +174,12 @@ function BookingModal() {
                 <polyline points="22 4 12 14.01 9 11.01" />
               </svg>
             </div>
-            <span className="booking-success-badge">RESERVATION & PAYMENT CONFIRMED</span>
-            <h3 className="booking-success-title">Your Journey is Booked!</h3>
+            <span className="booking-success-badge" style={{ background: "rgba(217, 154, 56, 0.15)", color: "var(--color-gold-warm)" }}>
+              ⏳ REQUEST SUBMITTED — AWAITING HOST CONFIRMATION
+            </span>
+            <h3 className="booking-success-title">Your Request has been Sent!</h3>
             <p className="booking-success-subtitle">
-              We have dispatched your reservation details directly to <strong>{itemTitle}</strong>. An official e-voucher
-              has been emailed to <strong>{bookingSuccess.traveler_email}</strong>.
+              We have dispatched your dates directly to <strong>{itemTitle}</strong>. The host will review their schedule and confirm. No payment is charged upfront.
             </p>
 
             <div className="booking-summary-receipt">

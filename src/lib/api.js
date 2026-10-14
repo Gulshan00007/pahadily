@@ -349,6 +349,31 @@ export async function updateBookingPayment(id, { payment_status, payment_method,
   return data;
 }
 
+export async function respondToBookingRequest(id, { decision, notes, suggested_date }) {
+  const response = await fetch(`${API_BASE_URL}/api/bookings/${id}/respond`, {
+    method: "PATCH",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ decision, notes, suggested_date }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || "Failed to submit response to booking request");
+  return data;
+}
+
+export async function getProviderBookings() {
+  const response = await fetch(`${API_BASE_URL}/api/bookings/provider-requests`, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) throw new Error("Could not load provider bookings");
+  return response.json();
+}
+
+export async function getProviderBusyDates(localId) {
+  const response = await fetch(`${API_BASE_URL}/api/locals/${localId}/busy-dates`);
+  if (!response.ok) return [];
+  return response.json();
+}
+
 export async function deleteBooking(id) {
   const response = await fetch(`${API_BASE_URL}/api/bookings/${id}`, {
     method: "DELETE",
@@ -409,4 +434,12 @@ export async function deleteHostApplication(id) {
   return data;
 }
 
+// Aliases for clear component ergonomics
+export const getBusyDates = getProviderBusyDates;
+export const getProviderRequests = getProviderBookings;
+export const respondToBooking = respondToBookingRequest;
+export const getBookings = getAllBookings;
+export const submitHostApplication = createHostApplication;
+
 export { API_BASE_URL };
+

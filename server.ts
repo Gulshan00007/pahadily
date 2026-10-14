@@ -10,9 +10,27 @@ import { EXPLORE_DESTINATIONS } from "./src/data/exploreDestinationsData.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const PORT = 3000;
-const HOST = "0.0.0.0";
+function getArg(flag: string): string | undefined {
+  const idx = process.argv.indexOf(flag);
+  return idx !== -1 && idx + 1 < process.argv.length ? process.argv[idx + 1] : undefined;
+}
+
+const PORT = Number(getArg("--port") || process.env.PORT) || 3000;
+const HOST = getArg("--host") || "0.0.0.0";
 const SECRET_KEY = process.env.JWT_SECRET || "pahadily_secret_mountain_key_2026_super_secure";
+
+// Prevent WebSocket or non-fatal address collisions from killing dev server
+process.on("uncaughtException", (err: any) => {
+  if (err?.message?.includes("WebSocket") || err?.code === "EADDRINUSE") {
+    console.warn("Ignored non-fatal server warning:", err.message);
+    return;
+  }
+  console.error("Uncaught exception:", err);
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.warn("Unhandled promise rejection:", reason);
+});
 
 // --- Types ---
 interface User {
@@ -117,6 +135,8 @@ interface Booking {
   traveler_phone?: string | null;
   travel_date: string;
   end_date?: string | null;
+  time_slot?: "morning" | "afternoon" | "full_day" | string;
+  activity_type?: string | null;
   guests: string;
   nights: number;
   total_price?: string | null;
@@ -125,7 +145,11 @@ interface Booking {
   payment_id?: string | null;
   transaction_ref?: string | null;
   message: string;
-  status: string;
+  status: "pending" | "confirmed" | "declined" | "cancelled" | "completed" | string;
+  provider_id?: number | null;
+  provider_name?: string | null;
+  provider_notes?: string | null;
+  suggested_date?: string | null;
   created_at: string;
 }
 
@@ -490,7 +514,89 @@ function initData() {
   }
 }
 
+// --- JSON Disk Persistence ---
+const DB_FILE = path.resolve(__dirname, "data", "pahadily_db_state.json");
+
+function saveDbState() {
+  try {
+    const dir = path.dirname(DB_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    const state = {
+      users: Array.from(users.entries()),
+      places: Array.from(places.entries()),
+      placeReviews: Array.from(placeReviews.entries()),
+      experiences: Array.from(experiences.entries()),
+      locals: Array.from(locals.entries()),
+      bookings: Array.from(bookings.entries()),
+      hostApplications: Array.from(hostApplications.entries()),
+      emailNotifications,
+      nextUserId,
+      nextPlaceId,
+      nextReviewId,
+      nextExperienceId,
+      nextLocalId,
+      nextBookingId,
+      nextHostAppId,
+      nextNotificationId,
+    };
+    fs.writeFileSync(DB_FILE, JSON.stringify(state, null, 2), "utf-8");
+  } catch (err) {
+    console.error("Failed to persist database state to file:", err);
+  }
+}
+
+function loadDbState() {
+  try {
+    if (fs.existsSync(DB_FILE)) {
+      const raw = fs.readFileSync(DB_FILE, "utf-8");
+      const state = JSON.parse(raw);
+      if (state.users) {
+        for (const [k, v] of state.users) users.set(k, v);
+      }
+      if (state.places) {
+        for (const [k, v] of state.places) places.set(k, v);
+      }
+      if (state.placeReviews) {
+        for (const [k, v] of state.placeReviews) placeReviews.set(k, v);
+      }
+      if (state.experiences) {
+        for (const [k, v] of state.experiences) experiences.set(k, v);
+      }
+      if (state.locals) {
+        for (const [k, v] of state.locals) locals.set(k, v);
+      }
+      if (state.bookings) {
+        for (const [k, v] of state.bookings) bookings.set(k, v);
+      }
+      if (state.hostApplications) {
+        for (const [k, v] of state.hostApplications) hostApplications.set(k, v);
+      }
+      if (Array.isArray(state.emailNotifications)) {
+        emailNotifications.length = 0;
+        emailNotifications.push(...state.emailNotifications);
+      }
+      if (state.nextUserId) nextUserId = Math.max(nextUserId, state.nextUserId);
+      if (state.nextPlaceId) nextPlaceId = Math.max(nextPlaceId, state.nextPlaceId);
+      if (state.nextReviewId) nextReviewId = Math.max(nextReviewId, state.nextReviewId);
+      if (state.nextExperienceId) nextExperienceId = Math.max(nextExperienceId, state.nextExperienceId);
+      if (state.nextLocalId) nextLocalId = Math.max(nextLocalId, state.nextLocalId);
+      if (state.nextBookingId) nextBookingId = Math.max(nextBookingId, state.nextBookingId);
+      if (state.nextHostAppId) nextHostAppId = Math.max(nextHostAppId, state.nextHostAppId);
+      if (state.nextNotificationId) nextNotificationId = Math.max(nextNotificationId, state.nextNotificationId);
+      console.log("Loaded persistent database state from file successfully.");
+      return true;
+    }
+  } catch (err) {
+    console.warn("Could not load db state:", err);
+  }
+  return false;
+}
+
 initData();
+loadDbState();
+saveDbState();
 
 // --- Express App Setup ---
 const app = express();
@@ -1201,52 +1307,217 @@ app.delete("/api/users/:id", authMiddleware(), (req: AuthenticatedRequest, res) 
   res.json({ message: "User account deleted successfully" });
 });
 
+// --- Double-Booking Conflict Prevention Helper ---
+function hasBookingConflict(
+  providerIdOrName: number | string,
+  travelDate: string,
+  timeSlot: string = "full_day",
+  excludeBookingId?: number
+): boolean {
+  for (const b of bookings.values()) {
+    if (excludeBookingId && b.id === excludeBookingId) continue;
+    if (b.status !== "confirmed") continue;
+
+    const isSameProvider =
+      (typeof providerIdOrName === "number" && b.item_id === providerIdOrName) ||
+      (b.provider_id && typeof providerIdOrName === "number" && b.provider_id === providerIdOrName) ||
+      (b.provider_name &&
+        typeof providerIdOrName === "string" &&
+        b.provider_name.toLowerCase().includes(providerIdOrName.toLowerCase())) ||
+      (b.item_title &&
+        typeof providerIdOrName === "string" &&
+        b.item_title.toLowerCase().includes(providerIdOrName.toLowerCase()));
+
+    if (!isSameProvider) continue;
+
+    if (b.travel_date === travelDate) {
+      if (b.time_slot === "full_day" || timeSlot === "full_day" || b.time_slot === timeSlot) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 // --- Bookings Endpoints ---
 app.post("/api/bookings", authMiddleware(true), (req: AuthenticatedRequest, res) => {
   const body = req.body;
-  const payId = body.payment_id || `PHD-PAY-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
+  const itemId = Number(body.item_id) || 1;
+  const bookingType = body.booking_type || "companion";
+  const travelDate = body.travel_date || new Date().toISOString().slice(0, 10);
+  const timeSlot = body.time_slot || "full_day";
+
+  // Prevent double-booking for the same local provider on identical date/slot
+  if (["companion", "guide", "local", "experience"].includes(bookingType)) {
+    if (hasBookingConflict(itemId, travelDate, timeSlot)) {
+      return res.status(409).json({
+        detail: `This provider is already booked on ${travelDate} (${timeSlot}). Please choose another date or time slot.`,
+        conflict: true,
+      });
+    }
+  }
+
+  // Look up provider if available
+  let matchedLocal = locals.get(itemId);
+  const providerName = body.provider_name || matchedLocal?.name || body.item_title || "Local Companion";
+
+  const payId = body.payment_id || `PHD-REQ-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
   const txnRef =
-    body.transaction_ref || `UPI-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    body.transaction_ref || `REQ-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
   const newBooking: Booking = {
     id: nextBookingId++,
-    booking_type: body.booking_type || "place",
-    item_id: Number(body.item_id) || 1,
-    item_title: body.item_title || "Himalayan Sanctuary",
-    item_image: body.item_image || null,
+    booking_type: bookingType,
+    item_id: itemId,
+    item_title: body.item_title || `${providerName} (${matchedLocal?.role || "Local Guide"})`,
+    item_image: body.item_image || matchedLocal?.image || null,
     user_id: req.user?.id || null,
     traveler_name: body.traveler_name || req.user?.full_name || "Traveler",
     traveler_email: (body.traveler_email || req.user?.email || "").toLowerCase(),
     traveler_phone: body.traveler_phone || req.user?.phone || null,
-    travel_date: body.travel_date || new Date().toISOString().slice(0, 10),
+    travel_date: travelDate,
     end_date: body.end_date || null,
+    time_slot: timeSlot,
+    activity_type: body.activity_type || "Village & Valley Discovery",
     guests: String(body.guests || "2"),
     nights: Number(body.nights) || 1,
-    total_price: body.total_price || "₹2,000",
-    payment_method: body.payment_method || "upi",
-    payment_status: body.payment_status || "paid",
+    total_price: body.total_price || matchedLocal?.price || "₹500",
+    payment_method: body.payment_method || "pay_on_meetup",
+    payment_status: "pending",
     payment_id: payId,
     transaction_ref: txnRef,
     message: body.message || "",
-    status: body.payment_status === "paid" ? "confirmed" : "pending",
+    status: "pending", // Always pending review by the provider
+    provider_id: matchedLocal?.id || null,
+    provider_name: providerName,
+    provider_notes: null,
+    suggested_date: null,
     created_at: new Date().toISOString(),
   };
 
   bookings.set(newBooking.id, newBooking);
+  saveDbState();
 
   emailNotifications.push({
     id: nextNotificationId++,
     recipient_email: newBooking.traveler_email,
     recipient_name: newBooking.traveler_name,
-    subject: `Booking Confirmed: ${newBooking.item_title} | Pahadíly Voucher #${newBooking.id}`,
-    email_type: "booking_confirmation",
+    subject: `Request Submitted: ${newBooking.item_title} | Pahadíly #${newBooking.id}`,
+    email_type: "booking_request_submitted",
     booking_id: newBooking.id,
     status: "sent",
-    preview: `Voucher #${newBooking.id} for ${newBooking.item_title} (${newBooking.total_price} via ${newBooking.payment_method})`,
+    preview: `Request #${newBooking.id} sent to ${providerName} for ${travelDate} (${timeSlot})`,
     created_at: new Date().toISOString(),
   });
 
   res.status(201).json(newBooking);
+});
+
+// Provider Accept / Decline endpoint with strict conflict validation
+app.patch("/api/bookings/:id/respond", authMiddleware(), (req: AuthenticatedRequest, res) => {
+  const id = Number(req.params.id);
+  const booking = bookings.get(id);
+  if (!booking) return res.status(404).json({ detail: "Booking request not found" });
+
+  const { decision, notes, suggested_date } = req.body;
+  if (!["accept", "decline"].includes(decision)) {
+    return res.status(400).json({ detail: "Decision must be 'accept' or 'decline'" });
+  }
+
+  // Verify authorization: User must be admin, or the provider assigned to this booking
+  const isAuthorized =
+    req.user?.role === "admin" ||
+    req.user?.role === "host" ||
+    req.user?.role === "guide" ||
+    (booking.provider_id && booking.provider_id === req.user?.id) ||
+    (booking.provider_name && req.user?.full_name && booking.provider_name.toLowerCase().includes(req.user.full_name.toLowerCase()));
+
+  if (!isAuthorized) {
+    return res.status(403).json({ detail: "Not authorized to respond to this booking request" });
+  }
+
+  if (decision === "accept") {
+    // Check again for conflicting confirmed booking
+    if (hasBookingConflict(booking.item_id, booking.travel_date, booking.time_slot, booking.id)) {
+      return res.status(409).json({
+        detail: `Cannot accept: Another booking is already confirmed for this provider on ${booking.travel_date} (${booking.time_slot}).`,
+        conflict: true,
+      });
+    }
+
+    booking.status = "confirmed";
+    booking.provider_notes = notes || "Booking request accepted! See you in the mountains.";
+    saveDbState();
+    
+    emailNotifications.push({
+      id: nextNotificationId++,
+      recipient_email: booking.traveler_email,
+      recipient_name: booking.traveler_name,
+      subject: `Confirmed! Your booking with ${booking.provider_name} is accepted | #${booking.id}`,
+      email_type: "booking_confirmed_by_provider",
+      booking_id: booking.id,
+      status: "sent",
+      preview: `Voucher #${booking.id} confirmed for ${booking.travel_date}`,
+      created_at: new Date().toISOString(),
+    });
+  } else {
+    booking.status = "declined";
+    booking.provider_notes = notes || "Provider was unavailable on this date.";
+    booking.suggested_date = suggested_date || null;
+    saveDbState();
+
+    emailNotifications.push({
+      id: nextNotificationId++,
+      recipient_email: booking.traveler_email,
+      recipient_name: booking.traveler_name,
+      subject: `Update on your Pahadíly request #${booking.id}`,
+      email_type: "booking_declined",
+      booking_id: booking.id,
+      status: "sent",
+      preview: `Provider declined request #${booking.id}. Notes: ${booking.provider_notes}`,
+      created_at: new Date().toISOString(),
+    });
+  }
+
+  res.json(booking);
+});
+
+// Provider bookings list
+app.get("/api/bookings/provider-requests", authMiddleware(), (req: AuthenticatedRequest, res) => {
+  if (!req.user || !["host", "admin", "guide"].includes(req.user.role)) {
+    return res.status(403).json({ detail: "Provider access required" });
+  }
+  const user = req.user;
+  let result = Array.from(bookings.values()).sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+
+  if (user.role !== "admin") {
+    const uName = user.full_name.toLowerCase();
+    result = result.filter(
+      (b) =>
+        b.provider_id === user.id ||
+        (b.provider_name && b.provider_name.toLowerCase().includes(uName)) ||
+        (b.item_title && b.item_title.toLowerCase().includes(uName))
+    );
+  }
+  res.json(result);
+});
+
+// Busy dates for a local provider
+app.get("/api/locals/:id/busy-dates", (req, res) => {
+  const id = Number(req.params.id);
+  const busySlots: Array<{ date: string; time_slot: string }> = [];
+
+  for (const b of bookings.values()) {
+    if (b.status === "confirmed" && b.item_id === id) {
+      busySlots.push({
+        date: b.travel_date,
+        time_slot: b.time_slot || "full_day",
+      });
+    }
+  }
+  res.json(busySlots);
 });
 
 app.get("/api/bookings", authMiddleware(), (req, res) => {
@@ -1268,6 +1539,7 @@ app.get("/api/bookings", authMiddleware(), (req, res) => {
         b.traveler_name.toLowerCase().includes(query) ||
         b.traveler_email.toLowerCase().includes(query) ||
         b.item_title.toLowerCase().includes(query) ||
+        (b.provider_name && b.provider_name.toLowerCase().includes(query)) ||
         (b.payment_id && b.payment_id.toLowerCase().includes(query)) ||
         (b.transaction_ref && b.transaction_ref.toLowerCase().includes(query))
     );
@@ -1396,6 +1668,7 @@ app.post("/api/host-applications", authMiddleware(true), (req: AuthenticatedRequ
   };
 
   hostApplications.set(newApp.id, newApp);
+  saveDbState();
   res.status(201).json({
     id: newApp.id,
     status: newApp.status,
@@ -1500,6 +1773,8 @@ app.patch("/api/host-applications/:id/status", authMiddleware(), (req: Authentic
     }
   }
 
+  saveDbState();
+
   res.json({
     id: appObj.id,
     status: appObj.status,
@@ -1551,7 +1826,7 @@ async function startServer() {
 
   if (isProduction && hasDist) {
     app.use(express.static(distPath));
-    app.get("*", (_req, res) => {
+    app.use((_req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });
   } else {
@@ -1562,14 +1837,40 @@ async function startServer() {
         middlewareMode: true,
         host: HOST,
         port: PORT,
+        hmr: false,
       },
       appType: "spa",
     });
     app.use(vite.middlewares);
+
+    // Fallback for SPA routing in development mode (Express 5 compatible)
+    app.use(async (req, res, next) => {
+      const url = req.originalUrl;
+      if (url.startsWith("/api/")) {
+        return next();
+      }
+      try {
+        const indexPath = path.resolve(__dirname, "index.html");
+        let template = fs.readFileSync(indexPath, "utf-8");
+        template = await vite.transformIndexHtml(url, template);
+        res.status(200).set({ "Content-Type": "text/html" }).end(template);
+      } catch (e: any) {
+        vite.ssrFixStacktrace(e);
+        next(e);
+      }
+    });
   }
 
-  app.listen(PORT, HOST, () => {
+  const server = app.listen(PORT, HOST, () => {
     console.log(`Pahadíly full-stack server running on http://${HOST}:${PORT}`);
+  });
+
+  server.on("error", (err: any) => {
+    if (err.code === "EADDRINUSE") {
+      console.warn(`Port ${PORT} in use, retrying or letting supervisor reconnect...`);
+    } else {
+      console.error("Server listen error:", err);
+    }
   });
 }
 

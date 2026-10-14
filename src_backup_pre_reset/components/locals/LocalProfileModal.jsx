@@ -1,22 +1,28 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { createBooking } from "../../lib/api";
+import { createBooking, getProviderBusyDates } from "../../lib/api";
 
 function LocalProfileModal({ local, onClose }) {
   const { user, showToast, setMyBookingsOpen } = useAuth();
   const [inquirySent, setInquirySent] = useState(false);
   const [inquiryDate, setInquiryDate] = useState("");
+  const [timeSlot, setTimeSlot] = useState("full_day"); // 'full_day' | 'morning' | 'afternoon'
   const [guests, setGuests] = useState("2");
+  const [activityType, setActivityType] = useState("Village & Trail Exploration");
   const [message, setMessage] = useState("");
   const [travelerName, setTravelerName] = useState("");
   const [travelerEmail, setTravelerEmail] = useState("");
+  const [travelerPhone, setTravelerPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [bookingResult, setBookingResult] = useState(null);
+  const [busyDates, setBusyDates] = useState([]);
+  const [conflictWarning, setConflictWarning] = useState("");
 
   useEffect(() => {
     if (user) {
       if (!travelerName) setTravelerName(user.full_name || "");
       if (!travelerEmail) setTravelerEmail(user.email || "");
+      if (!travelerPhone && user.phone) setTravelerPhone(user.phone || "");
     }
   }, [user]);
 
@@ -28,6 +34,35 @@ function LocalProfileModal({ local, onClose }) {
       setInquiryDate(tomorrow.toISOString().split("T")[0]);
     }
   }, []);
+
+  // Fetch busy dates for this provider
+  useEffect(() => {
+    if (local?.id) {
+      getProviderBusyDates(local.id).then((dates) => {
+        setBusyDates(dates || []);
+      });
+    }
+  }, [local?.id]);
+
+  // Check for conflict on inquiryDate or timeSlot change
+  useEffect(() => {
+    if (!inquiryDate) {
+      setConflictWarning("");
+      return;
+    }
+    const matchingBusy = busyDates.find((b) => {
+      if (b.date !== inquiryDate) return false;
+      return b.time_slot === "full_day" || timeSlot === "full_day" || b.time_slot === timeSlot;
+    });
+
+    if (matchingBusy) {
+      setConflictWarning(
+        `⚠️ ${local?.name?.split(" ")[0] || "This provider"} already has a confirmed journey on ${inquiryDate} (${matchingBusy.time_slot.replace("_", " ")}). Please pick another date or slot.`
+      );
+    } else {
+      setConflictWarning("");
+    }
+  }, [inquiryDate, timeSlot, busyDates, local?.name]);
 
   // Close on Escape key
   useEffect(() => {
@@ -50,30 +85,41 @@ function LocalProfileModal({ local, onClose }) {
     .join("")
     .slice(0, 2);
 
+  const isTrekGuide = local.category === "trek-guides" || local.role?.toLowerCase().includes("trek");
+
   const handleSubmitInquiry = async (e) => {
     e.preventDefault();
+    if (conflictWarning) {
+      showToast("Please choose an available date and time slot", "error");
+      return;
+    }
+
     setSubmitting(true);
 
     try {
       const payload = {
-        booking_type: "local",
+        booking_type: isTrekGuide ? "guide" : "companion",
         item_id: Number(local.id) || 1,
         item_title: `${local.name} (${local.role})`,
         item_image: local.image || null,
+        provider_name: local.name,
         traveler_name: travelerName || user?.full_name || "Mountain Traveler",
         traveler_email: travelerEmail || user?.email || "traveler@pahadily.com",
+        traveler_phone: travelerPhone || user?.phone || null,
         travel_date: inquiryDate,
+        time_slot: timeSlot,
+        activity_type: activityType,
         guests: String(guests),
         total_price: local.price,
-        message: message || `Visiting ${local.location} and would love to connect.`,
+        message: message || `Visiting ${local.location} and would love to explore together with local guidance.`,
       };
 
       const res = await createBooking(payload);
       setBookingResult(res);
       setInquirySent(true);
-      showToast(`Inquiry sent to ${local.name.split(" ")[0]}!`);
+      showToast(`Booking request dispatched to ${local.name.split(" ")[0]}!`);
     } catch (err) {
-      showToast(err.message || "Could not submit inquiry", "error");
+      showToast(err.message || "Could not submit booking request", "error");
     } finally {
       setSubmitting(false);
     }
@@ -84,6 +130,7 @@ function LocalProfileModal({ local, onClose }) {
       <div
         className="local-modal-container"
         onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: 840 }}
       >
         {/* Close Button */}
         <button
@@ -111,7 +158,7 @@ function LocalProfileModal({ local, onClose }) {
               </div>
             )}
             {local.verified && (
-              <span className="local-modal-badge" title="Pahadíly Verified Local">
+              <span className="local-modal-badge" title="Pahadíly Verified Local Resident">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
@@ -123,11 +170,9 @@ function LocalProfileModal({ local, onClose }) {
             <div className="local-modal-title-row">
               <h2 className="local-modal-name">{local.name}</h2>
               <div className="local-modal-rating">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="#f59e0b" stroke="#f59e0b" strokeWidth="1.5">
-                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                </svg>
-                <span className="rating-score">{local.rating}</span>
-                <span className="rating-count">({local.reviews} verified reviews)</span>
+                <span style={{ fontSize: "12px", background: "rgba(43, 112, 80, 0.12)", color: "var(--color-forest-medium)", padding: "2px 8px", borderRadius: "4px", fontWeight: 700 }}>
+                  {local.role}
+                </span>
               </div>
             </div>
 
@@ -136,22 +181,23 @@ function LocalProfileModal({ local, onClose }) {
                 <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
                 <circle cx="12" cy="10" r="3" />
               </svg>
-              <span>{local.location}</span>
+              <span>{local.location} (Kullu District)</span>
             </div>
 
             <div className="local-modal-badges-row">
-              <span className="local-badge-pill role">{local.role}</span>
-              <span className="local-badge-pill lang">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="2" y1="12" x2="22" y2="12" />
-                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-                </svg>
-                {local.lang}
-              </span>
-              {local.certified && (
-                <span className="local-badge-pill cert">Certified High-Altitude Guide</span>
+              {isTrekGuide && local.certified ? (
+                <span className="local-badge-pill cert" style={{ background: "rgba(26, 92, 159, 0.15)", color: "#1a5c9f", border: "1px solid #1a5c9f" }}>
+                  🎖️ Verified Mountaineering Guide
+                </span>
+              ) : (
+                <span className="local-badge-pill role" style={{ background: "rgba(43, 112, 80, 0.12)", color: "var(--color-forest-medium)" }}>
+                  🤝 Native Village Companion
+                </span>
               )}
+
+              <span className="local-badge-pill lang">
+                🗣️ {local.lang}
+              </span>
             </div>
           </div>
         </div>
@@ -164,12 +210,12 @@ function LocalProfileModal({ local, onClose }) {
               <h3 className="local-section-heading">About {local.name.split(" ")[0]}</h3>
               <p className="local-bio-text">
                 {local.bio ||
-                  `Born and raised in the heart of Himachal Pradesh, ${local.name.split(" ")[0]} has been welcoming travelers and exploring quiet trails for over 6 years. With deep knowledge of native traditions, foraging paths, and secret vistas, journeys with ${local.name.split(" ")[0]} are authentic, heartwarming, and slow.`}
+                  `Born and raised in Himachal Pradesh, ${local.name.split(" ")[0]} shares authentic mountain traditions, quiet forest glades, and heritage trails with mindful visitors.`}
               </p>
             </section>
 
             <section className="local-modal-section">
-              <h3 className="local-section-heading">What I Specialize In</h3>
+              <h3 className="local-section-heading">Specialties & Local Expertise</h3>
               <div className="local-specialties-grid">
                 {(local.tags || ["Village Trails", "Local Lore", "Safe Guiding"]).map((tag) => (
                   <div key={tag} className="specialty-item">
@@ -180,32 +226,18 @@ function LocalProfileModal({ local, onClose }) {
               </div>
             </section>
 
-            <section className="local-modal-section">
-              <h3 className="local-section-heading">Host Highlights</h3>
-              <div className="local-highlights-list">
-                <div className="highlight-item">
-                  <span className="highlight-icon">⏱️</span>
-                  <div>
-                    <strong>Response Time:</strong> Within 2 hours
-                  </div>
-                </div>
-                <div className="highlight-item">
-                  <span className="highlight-icon">🏔️</span>
-                  <div>
-                    <strong>Local Knowledge:</strong> Native resident (10+ years)
-                  </div>
-                </div>
-                <div className="highlight-item">
-                  <span className="highlight-icon">🤝</span>
-                  <div>
-                    <strong>Pahadíly Promise:</strong> 100% direct remuneration to host
-                  </div>
-                </div>
-              </div>
-            </section>
+            {/* Honest verification note */}
+            <div style={{ background: "var(--color-bg-card)", padding: "14px 16px", borderRadius: "10px", border: "1px solid var(--color-border-subtle)", fontSize: "13px", color: "var(--color-text-muted)" }}>
+              <strong style={{ color: "var(--color-forest-dark)", display: "block", marginBottom: "4px" }}>
+                🛡️ Pahadíly Community Standard
+              </strong>
+              {isTrekGuide
+                ? "This provider leads alpine treks and holds verified high-altitude training credentials."
+                : "This companion is a native resident helping visitors explore familiar local walking paths, villages, and culture within their stated capabilities. Not an extreme mountaineering guide."}
+            </div>
           </div>
 
-          {/* Right: Booking / Inquiry Box */}
+          {/* Right: Booking Request Box */}
           <div className="local-modal-right">
             <div className="local-booking-card">
               <div className="booking-price-header">
@@ -213,7 +245,7 @@ function LocalProfileModal({ local, onClose }) {
                   <span className="price-tag">{local.price}</span>
                   <span className="price-unit"> {local.unit}</span>
                 </div>
-                <span className="price-note">All-inclusive host fee</span>
+                <span className="price-note">100% direct to host</span>
               </div>
 
               {inquirySent ? (
@@ -223,16 +255,21 @@ function LocalProfileModal({ local, onClose }) {
                       <polyline points="20 6 9 17 4 12" />
                     </svg>
                   </div>
-                  <h4>Inquiry Sent Successfully!</h4>
-                  <p>
-                    {local.name.split(" ")[0]} will review your request and get back to you within 2 hours.
+                  <h4>Booking Request Submitted!</h4>
+                  <p style={{ fontSize: "14px", color: "var(--color-text-muted)", lineHeight: "1.5" }}>
+                    Your request has been routed to <strong>{local.name}</strong>. The provider will review their schedule and respond.
                   </p>
+
                   {bookingResult && (
-                    <div className="inquiry-ref-box">
-                      <span>Booking Ref: </span>
-                      <strong>#PAH-{bookingResult.id.toString().padStart(4, "0")}</strong>
+                    <div className="inquiry-ref-box" style={{ background: "var(--color-bg-ivory)", padding: "12px", borderRadius: "8px", margin: "14px 0" }}>
+                      <div style={{ fontSize: "12px", color: "var(--color-text-faint)" }}>Request Reference</div>
+                      <strong style={{ fontSize: "16px", color: "var(--color-forest-dark)" }}>#PHD-REQ-{bookingResult.id}</strong>
+                      <div style={{ fontSize: "12px", color: "var(--color-terracotta-warm)", marginTop: "4px", fontWeight: 700 }}>
+                        ⏳ Status: Pending Provider Approval
+                      </div>
                     </div>
                   )}
+
                   <div className="inquiry-success-buttons">
                     <button
                       type="button"
@@ -242,21 +279,22 @@ function LocalProfileModal({ local, onClose }) {
                         setMyBookingsOpen(true);
                       }}
                     >
-                      View in My Bookings
+                      Track in My Trips
                     </button>
                     <button
                       type="button"
                       className="send-another-btn"
                       onClick={() => setInquirySent(false)}
                     >
-                      Send Another Message
+                      Modify Request
                     </button>
                   </div>
                 </div>
               ) : (
                 <form onSubmit={handleSubmitInquiry} className="local-inquiry-form">
+                  {/* Step 1: Date */}
                   <div className="form-group">
-                    <label>Preferred Travel Date</label>
+                    <label>Preferred Date</label>
                     <input
                       type="date"
                       required
@@ -266,6 +304,28 @@ function LocalProfileModal({ local, onClose }) {
                     />
                   </div>
 
+                  {/* Step 2: Time Slot */}
+                  <div className="form-group">
+                    <label>Time Slot</label>
+                    <select
+                      value={timeSlot}
+                      onChange={(e) => setTimeSlot(e.target.value)}
+                      className="inquiry-input"
+                    >
+                      <option value="full_day">Full Day (approx. 9:00 AM – 5:00 PM)</option>
+                      <option value="morning">Morning Walk (8:30 AM – 1:00 PM)</option>
+                      <option value="afternoon">Afternoon & Sunset (1:30 PM – 6:00 PM)</option>
+                    </select>
+                  </div>
+
+                  {/* Conflict indicator */}
+                  {conflictWarning && (
+                    <div style={{ background: "#fdf2ef", border: "1px solid var(--color-terracotta-warm)", color: "var(--color-terracotta-warm)", padding: "10px", borderRadius: "8px", fontSize: "13px", marginBottom: "14px" }}>
+                      {conflictWarning}
+                    </div>
+                  )}
+
+                  {/* Step 3: Group Size */}
                   <div className="form-group">
                     <label>Group Size</label>
                     <select
@@ -280,6 +340,22 @@ function LocalProfileModal({ local, onClose }) {
                     </select>
                   </div>
 
+                  {/* Step 4: Activity Focus */}
+                  <div className="form-group">
+                    <label>Desired Experience</label>
+                    <select
+                      value={activityType}
+                      onChange={(e) => setActivityType(e.target.value)}
+                      className="inquiry-input"
+                    >
+                      <option value="Village & Heritage Walk">Village & Heritage Walk</option>
+                      <option value="Hidden Waterfalls & Streams">Hidden Waterfalls & Streams</option>
+                      <option value="Quiet Pine Ridge Trails">Quiet Pine Ridge Trails</option>
+                      <option value="Local Food & Farm Experience">Local Food & Farm Experience</option>
+                      <option value="Slow Exploration & Storytelling">Slow Exploration & Storytelling</option>
+                    </select>
+                  </div>
+
                   {!user && (
                     <>
                       <div className="form-group">
@@ -287,7 +363,7 @@ function LocalProfileModal({ local, onClose }) {
                         <input
                           type="text"
                           required
-                          placeholder="e.g. Maya Verma"
+                          placeholder="e.g., Maya Verma"
                           value={travelerName}
                           onChange={(e) => setTravelerName(e.target.value)}
                           className="inquiry-input"
@@ -304,17 +380,26 @@ function LocalProfileModal({ local, onClose }) {
                           className="inquiry-input"
                         />
                       </div>
+                      <div className="form-group">
+                        <label>Phone / WhatsApp (Optional)</label>
+                        <input
+                          type="tel"
+                          placeholder="+91 98765 43210"
+                          value={travelerPhone}
+                          onChange={(e) => setTravelerPhone(e.target.value)}
+                          className="inquiry-input"
+                        />
+                      </div>
                     </>
                   )}
 
                   <div className="form-group">
-                    <label>Message / What are you looking for?</label>
+                    <label>Special Requests / Notes</label>
                     <textarea
-                      rows="3"
-                      placeholder={`Hi ${local.name.split(" ")[0]}, we are visiting ${local.location.split(",")[0]} and would love to connect...`}
+                      rows="2"
+                      placeholder={`Hi ${local.name.split(" ")[0]}, we are traveling at a gentle pace and would love to discover quiet viewpoints...`}
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
-                      required
                       className="inquiry-input inquiry-textarea"
                     ></textarea>
                   </div>
@@ -322,13 +407,14 @@ function LocalProfileModal({ local, onClose }) {
                   <button
                     type="submit"
                     className="local-inquiry-submit"
-                    disabled={submitting}
+                    disabled={submitting || !!conflictWarning}
+                    style={{ opacity: conflictWarning ? 0.6 : 1 }}
                   >
                     {submitting ? (
-                      <span>Sending Request...</span>
+                      <span>Submitting Request...</span>
                     ) : (
                       <>
-                        <span>Connect with {local.name.split(" ")[0]}</span>
+                        <span>Request Availability</span>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                           <path d="M5 12h14" />
                           <path d="m12 5 7 7-7 7" />
@@ -337,9 +423,13 @@ function LocalProfileModal({ local, onClose }) {
                     )}
                   </button>
 
-                  <div className="booking-trust-points">
-                    <small>🛡️ No upfront payment required to inquire</small>
-                    <small>🌿 Direct support to native mountain families</small>
+                  <div className="booking-trust-points" style={{ marginTop: "12px", borderTop: "1px solid var(--color-border-subtle)", paddingTop: "10px" }}>
+                    <small style={{ display: "block", color: "var(--color-text-muted)" }}>
+                      📌 <strong>Availability Request:</strong> No money is charged now. {local.name.split(" ")[0]} reviews the request and confirms availability.
+                    </small>
+                    <small style={{ display: "block", color: "var(--color-forest-medium)", marginTop: "4px" }}>
+                      🌿 Direct local community earning with zero middleman commissions.
+                    </small>
                   </div>
                 </form>
               )}

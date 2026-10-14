@@ -1,108 +1,87 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "./context/AuthContext";
-import Navbar from "./components/Navbar";
-import Hero from "./components/Hero";
-import FeaturedDestinations from "./components/FeaturedDestinations";
-import ImpactSection from "./components/ImpactSection";
-import Footer from "./components/Footer";
-import SEO from "./components/common/SEO";
-import ExplorePage from "./pages/ExplorePage";
-import BookStayPage from "./pages/BookStayPage";
-import ExperiencesPage from "./pages/ExperiencesPage";
-import LocalsPage from "./pages/LocalsPage";
-import AdminPage from "./pages/AdminPage";
-import HostPortalPage from "./pages/HostPortalPage";
-import NotFoundPage from "./pages/NotFoundPage";
-import AuthModal from "./components/auth/AuthModal";
-import BookingModal from "./components/booking/BookingModal";
-import MyBookingsModal from "./components/booking/MyBookingsModal";
-import Toast from "./components/common/Toast";
-import {
-  generateOrganizationSchema,
-  generateWebSiteSchema,
-  generateBreadcrumbSchema,
-} from "./utils/seo";
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
+import Navbar from './components/Navbar';
+import Footer from './components/Footer';
 
-function HomePage() {
-  const homeSchemas = [
-    generateOrganizationSchema(),
-    generateWebSiteSchema(),
-    generateBreadcrumbSchema([{ name: "Home", url: "/" }]),
-  ];
+// Pages
+import HomePage from './pages/HomePage';
+import ExplorePage from './pages/ExplorePage';
+import ExperiencesPage from './pages/ExperiencesPage';
+import CompanionsPage from './pages/CompanionsPage';
+import StaysPage from './pages/StaysPage';
+import StoriesPage from './pages/StoriesPage';
+import BecomeALocalPage from './pages/BecomeALocalPage';
+import MyBookingsPage from './pages/MyBookingsPage';
+import ProviderPortalPage from './pages/ProviderPortalPage';
+import AdminPortalPage from './pages/AdminPortalPage';
 
+// Global Modals & Notifications
+import AuthModal from './components/modals/AuthModal';
+import BookingModal from './components/modals/BookingModal';
+import MyBookingsModal from './components/modals/MyBookingsModal';
+import ProviderPortalModal from './components/modals/ProviderPortalModal';
+import AdminPortalModal from './components/modals/AdminPortalModal';
+import HostApplicationModal from './components/modals/HostApplicationModal';
+import DestinationDetailModal from './components/modals/DestinationDetailModal';
+import Toast from './components/Toast';
+
+function AppLayout() {
   return (
-    <div className="pahadily-app">
-      <SEO
-        title="Pahadíly | Discover Hidden Places & Homestays in Himachal Pradesh"
-        description="Discover authentic Himalayan homestays, local mountain guides, and slow community travel experiences across Kullu, Tirthan, and offbeat Himachal Pradesh valleys."
-        canonicalPath="/"
-        ogImage="/images/hero/himachal-hero.jpg"
-        schema={homeSchemas}
-      />
-      <Navbar activePage="home" />
-      <main>
-        <Hero />
-        <FeaturedDestinations />
-        <ImpactSection />
+    <div
+      className="pahadily-app"
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        backgroundColor: '#F7F5EE',
+      }}
+    >
+      {/* 1. Official Pahadíly Brand Logo & Role-Aware Sticky Navbar */}
+      <Navbar />
+
+      {/* 2. Main Content Routing */}
+      <main style={{ flex: 1 }}>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/explore" element={<ExplorePage />} />
+          <Route path="/experiences" element={<ExperiencesPage />} />
+          <Route path="/companions" element={<CompanionsPage />} />
+          <Route path="/locals" element={<CompanionsPage />} />
+          <Route path="/stays" element={<StaysPage />} />
+          <Route path="/stories" element={<StoriesPage />} />
+          <Route path="/become-a-local" element={<BecomeALocalPage />} />
+          <Route path="/my-bookings" element={<MyBookingsPage />} />
+          <Route path="/provider-portal" element={<ProviderPortalPage />} />
+          <Route path="/admin" element={<AdminPortalPage />} />
+          {/* Fallback to Home */}
+          <Route path="*" element={<HomePage />} />
+        </Routes>
       </main>
+
+      {/* 3. Authentic Himalayan Footer */}
       <Footer />
+
+      {/* 4. Global Modals (accessible across all pages & buttons) */}
+      <AuthModal />
+      <BookingModal />
+      <MyBookingsModal />
+      <ProviderPortalModal />
+      <AdminPortalModal />
+      <HostApplicationModal />
+      <DestinationDetailModal />
+
+      {/* 5. Notification Toast */}
+      <Toast />
     </div>
   );
 }
 
-function App() {
+export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          {/* Public Indexable Routes */}
-          <Route path="/" element={<HomePage />} />
-          <Route path="/explore" element={<ExplorePage />} />
-          
-          {/* Destination Deep-Dive Canonical Routes */}
-          <Route path="/destinations/:slug" element={<ExplorePage />} />
-          <Route path="/destination/:slug" element={<ExplorePage />} />
-          <Route path="/explore/:slug" element={<ExplorePage />} />
-
-          {/* Stays & Accommodation Routes */}
-          <Route path="/stays" element={<BookStayPage />} />
-          <Route path="/book-stay" element={<BookStayPage />} />
-          <Route path="/book" element={<BookStayPage />} />
-          <Route path="/stays/:stayId" element={<ExplorePage />} />
-          <Route path="/stay/:stayId" element={<ExplorePage />} />
-
-          {/* Attractions Routes */}
-          <Route path="/attractions/:attractionId" element={<ExplorePage />} />
-          <Route path="/attraction/:attractionId" element={<ExplorePage />} />
-
-          {/* Slow Travel Experiences Routes */}
-          <Route path="/experiences" element={<ExperiencesPage />} />
-          <Route path="/experiences/:id" element={<ExperiencesPage />} />
-
-          {/* Local Companions & Mountain Guides Routes */}
-          <Route path="/locals" element={<LocalsPage />} />
-          <Route path="/locals/:id" element={<LocalsPage />} />
-
-          {/* Partner & Host Portals (noindex) */}
-          <Route path="/host" element={<HostPortalPage />} />
-          <Route path="/host-portal" element={<HostPortalPage />} />
-          <Route path="/become-a-host" element={<HostPortalPage />} />
-
-          {/* Operations & Administration (noindex, nofollow) */}
-          <Route path="/admin" element={<AdminPage />} />
-
-          {/* 404 Catch-All Route with Crawlable Links */}
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
-
-        {/* Global Modals & Notifications */}
-        <AuthModal />
-        <BookingModal />
-        <MyBookingsModal />
-        <Toast />
-      </BrowserRouter>
-    </AuthProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <AppLayout />
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
-
-export default App;
