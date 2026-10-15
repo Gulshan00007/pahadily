@@ -106,7 +106,7 @@ export default function Footer() {
             >
               <li>
                 <Link to="/explore" style={{ color: 'inherit', textDecoration: 'none' }}>
-                  Interactive Topo Map
+                  Explore Destinations Directory
                 </Link>
               </li>
               <li>

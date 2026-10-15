@@ -96,7 +96,7 @@ export default function CommunityImpactSection() {
                 <span>→</span>
               </Link>
               <Link
-                to="/stories"
+                to="/explore"
                 style={{
                   padding: '12px 22px',
                   borderRadius: '9999px',
@@ -108,7 +108,7 @@ export default function CommunityImpactSection() {
                   border: '1px solid rgba(247, 245, 238, 0.2)',
                 }}
               >
-                Read Community Stories
+                Explore Verified Places
               </Link>
             </div>
           </div>

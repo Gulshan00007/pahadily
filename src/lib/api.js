@@ -582,6 +582,12 @@ export async function uploadPhoto({ data, filename }) {
   return resData;
 }
 
+export async function getDiscoveryStats() {
+  const response = await fetch(`${API_BASE_URL}/api/discovery/stats`);
+  if (!response.ok) throw new Error("Could not fetch discovery stats");
+  return response.json();
+}
+
 // Aliases for clear component ergonomics
 export const getBusyDates = getProviderBusyDates;
 export const getProviderRequests = getProviderBookings;

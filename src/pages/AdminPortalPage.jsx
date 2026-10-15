@@ -1314,7 +1314,7 @@ export default function AdminPortalPage() {
                     style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid rgba(16, 37, 29, 0.2)', fontSize: '13.5px', backgroundColor: '#FFFFFF' }}
                   >
                     <option value="draft">Draft (Private to Admin)</option>
-                    <option value="published">Published (Live on Website & Map)</option>
+                    <option value="published">Published (Live on Website Directory)</option>
                     <option value="archived">Archived</option>
                   </select>
                 </div>

@@ -1,9 +1,6 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { EXPLORE_DESTINATIONS } from "../src/data/exploreDestinationsData.js";
-import { VERIFIED_EXPERIENCES } from "../src/data/experiencesData.js";
-import { VERIFIED_LOCALS } from "../src/data/localsData.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -28,42 +25,31 @@ function addUrl(pathname, priority, changefreq) {
   }
 }
 
-// 1. Core Public Static Pages (strictly canonical URLs only, excluding aliases like /book-stay)
+// 1. Core Public Static Pages
 addUrl("/", "1.0", "weekly");
-addUrl("/explore", "0.9", "weekly");
-addUrl("/stays", "0.9", "weekly");
+addUrl("/explore", "0.95", "daily");
+addUrl("/companions", "0.90", "weekly");
+addUrl("/stays", "0.90", "weekly");
 addUrl("/experiences", "0.85", "weekly");
-addUrl("/locals", "0.85", "weekly");
+addUrl("/become-a-local", "0.80", "monthly");
 
-// 2. All 8 Verified Himalayan Destinations & their Stays + Attractions
-EXPLORE_DESTINATIONS.forEach((dest) => {
-  const destSlug = dest.slug || dest.id;
-  addUrl(`/destinations/${destSlug}`, "0.85", "weekly");
-
-  // Add all verified stays under this destination
-  if (Array.isArray(dest.stays)) {
-    dest.stays.forEach((stay) => {
-      addUrl(`/stays/${stay.id}`, "0.75", "monthly");
-    });
+// 2. Real Published Locations from Database (if any exist)
+try {
+  const dbPath = path.resolve(__dirname, "../data/pahadily_db_state.json");
+  if (fs.existsSync(dbPath)) {
+    const dbState = JSON.parse(fs.readFileSync(dbPath, "utf-8"));
+    if (Array.isArray(dbState.locations)) {
+      dbState.locations.forEach((entry) => {
+        const loc = entry[1] || entry;
+        if (loc && loc.status === "published" && loc.slug) {
+          addUrl(`/explore?valley=${encodeURIComponent(loc.valley || loc.slug)}`, "0.75", "weekly");
+        }
+      });
+    }
   }
-
-  // Add all verified attractions under this destination
-  if (Array.isArray(dest.nearbyAttractions)) {
-    dest.nearbyAttractions.forEach((att) => {
-      addUrl(`/attractions/${att.id}`, "0.70", "monthly");
-    });
-  }
-});
-
-// 3. Verified Slow Travel Experiences from data/experiencesData.js
-VERIFIED_EXPERIENCES.forEach((exp) => {
-  addUrl(`/experiences/${exp.id}`, "0.75", "monthly");
-});
-
-// 4. Verified Native Companions, Guides & Hosts from data/localsData.js
-VERIFIED_LOCALS.forEach((local) => {
-  addUrl(`/locals/${local.id}`, "0.70", "monthly");
-});
+} catch {
+  // Graceful fallback
+}
 
 // Build standard XML
 const xmlLines = [

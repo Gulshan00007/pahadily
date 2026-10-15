@@ -17,6 +17,15 @@ function getArg(flag: string): string | undefined {
   return idx !== -1 && idx + 1 < process.argv.length ? process.argv[idx + 1] : undefined;
 }
 
+try {
+  const envPath = path.resolve(process.cwd(), ".env");
+  if (fs.existsSync(envPath) && typeof (process as any).loadEnvFile === "function") {
+    (process as any).loadEnvFile(envPath);
+  }
+} catch {
+  // Ignore missing or unreadable .env file
+}
+
 const PORT = Number(getArg("--port") || process.env.PORT) || 3000;
 const HOST = getArg("--host") || "0.0.0.0";
 const IS_PROD = process.env.NODE_ENV === "production";
@@ -154,6 +163,7 @@ export interface Booking {
   provider_name?: string | null;
   provider_notes?: string | null;
   suggested_date?: string | null;
+  notification_events?: string[];
   created_at: string;
 }
 
@@ -194,7 +204,7 @@ export interface EmailNotification {
   subject: string;
   email_type: string;
   booking_id?: number | null;
-  status: "sent" | "failed" | "unavailable";
+  status: "accepted" | "sent" | "delivered" | "failed" | "unavailable";
   preview: string;
   created_at: string;
 }
@@ -557,6 +567,37 @@ async function initDatabase() {
           preview TEXT,
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
+
+        CREATE TABLE IF NOT EXISTS location_categories (
+          id VARCHAR(100) PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          icon VARCHAR(50),
+          description TEXT,
+          is_active BOOLEAN NOT NULL DEFAULT true,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS locations (
+          id SERIAL PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          slug VARCHAR(255) NOT NULL,
+          district VARCHAR(100) NOT NULL,
+          valley VARCHAR(100) NOT NULL,
+          village VARCHAR(255),
+          category VARCHAR(100) NOT NULL,
+          description TEXT,
+          latitude NUMERIC(10, 6),
+          longitude NUMERIC(10, 6),
+          cover_image TEXT,
+          gallery JSONB DEFAULT '[]'::jsonb,
+          best_time VARCHAR(100),
+          difficulty VARCHAR(100),
+          safety_notes TEXT,
+          tags JSONB DEFAULT '[]'::jsonb,
+          status VARCHAR(50) NOT NULL DEFAULT 'draft',
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
       `);
 
       console.log("[Storage] PostgreSQL schema tables verified.");
@@ -664,12 +705,17 @@ function hasBookingConflict(
   providerIdOrName: number | string,
   travelDate: string,
   timeSlot: string = "full_day",
-  excludeBookingId?: number
+  excludeBookingId?: number,
+  bookingType?: string
 ): boolean {
   for (const b of bookings.values()) {
     if (excludeBookingId && b.id === excludeBookingId) continue;
     // Only accepted/confirmed bookings block the slot
     if (b.status !== "confirmed") continue;
+
+    if (bookingType && b.booking_type && b.booking_type !== bookingType) {
+      continue;
+    }
 
     const isSameProvider =
       (typeof providerIdOrName === "number" && b.item_id === providerIdOrName) ||
@@ -692,20 +738,97 @@ function hasBookingConflict(
   return false;
 }
 
-// --- Real SMTP Email Dispatcher with Accurate Status Reporting ---
+function escapeHtml(str?: string | null): string {
+  if (!str) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+// --- Site URL Helper (Never outputs localhost in production emails) ---
+function getSiteUrl(req?: Request): string {
+  if (process.env.VITE_SITE_URL && !process.env.VITE_SITE_URL.includes("localhost")) {
+    return process.env.VITE_SITE_URL.replace(/\/$/, "");
+  }
+  if (req) {
+    const origin = req.get("origin");
+    if (origin && !origin.includes("localhost")) {
+      return origin.replace(/\/$/, "");
+    }
+    const host = req.get("host");
+    if (host && !host.includes("localhost")) {
+      const proto = req.protocol === "https" || req.get("x-forwarded-proto") === "https" ? "https" : "http";
+      return `${proto}://${host}`;
+    }
+  }
+  return "https://pahadily.com";
+}
+
+// --- Strict Pricing & Date Validation Helpers ---
+function parseItemPrice(rawPrice?: string | null, fallback: number = 1800): number {
+  if (!rawPrice) return fallback;
+  const num = parseInt(String(rawPrice).replace(/[^0-9]/g, ""), 10);
+  return !isNaN(num) && num > 0 ? num : fallback;
+}
+
+function calculateStayPricingAndDates(
+  travelDate: string,
+  nightsInput: any,
+  guestsInput: any,
+  matchedLocation?: LocationItem | null,
+  matchedPlace?: Place | null
+) {
+  const nights = Math.min(30, Math.max(1, parseInt(String(nightsInput || "1"), 10) || 1));
+  const guests = Math.min(20, Math.max(1, parseInt(String(guestsInput || "1"), 10) || 1));
+
+  // Server-side UTC-safe date math
+  const [y, m, d] = travelDate.split("-").map(Number);
+  const checkInUtc = new Date(Date.UTC(y, m - 1, d));
+  const checkOutUtc = new Date(checkInUtc);
+  checkOutUtc.setUTCDate(checkOutUtc.getUTCDate() + nights);
+  const end_date = checkOutUtc.toISOString().slice(0, 10);
+
+  const rawPriceStr = (matchedLocation as any)?.price || matchedPlace?.price || "₹1,800";
+  const unitStr = (matchedLocation as any)?.unit || matchedPlace?.unit || "/night";
+  const baseRate = parseItemPrice(rawPriceStr, 1800);
+  const isPerPerson = unitStr.toLowerCase().includes("person");
+
+  const computedTotal = isPerPerson ? baseRate * guests * nights : baseRate * nights;
+  const total_price = `₹${computedTotal.toLocaleString("en-IN")}`;
+
+  return { nights, guests, end_date, total_price, baseRate };
+}
+
+// --- Real SMTP Email Dispatcher with Accurate Status Reporting & Deduplication ---
 async function dispatchEmailNotification(
   recipientEmail: string,
   recipientName: string,
   subject: string,
   emailType: string,
   bookingId?: number | null,
-  bodyText?: string
+  bodyText?: string,
+  htmlContent?: string
 ): Promise<EmailNotification> {
+  // Deduplication check: prevent identical dispatch within short window
+  if (bookingId && emailType) {
+    const existingRecent = emailNotifications.find(
+      (n) => n.booking_id === bookingId && n.email_type === emailType && (n.status === "accepted" || n.status === "sent")
+    );
+    if (existingRecent) {
+      console.log(`[Email] Skipping duplicate dispatch for booking #${bookingId} event '${emailType}' (already ${existingRecent.status})`);
+      return existingRecent;
+    }
+  }
+
   const smtpHost = process.env.SMTP_HOST;
   const smtpPort = Number(process.env.SMTP_PORT) || 587;
   const smtpUser = process.env.SMTP_USER;
   const smtpPass = process.env.SMTP_PASSWORD;
-  const smtpFrom = process.env.SMTP_FROM || `"Pahadíly" <no-reply@pahadily.com>`;
+  const senderName = process.env.SENDER_NAME || "Pahadíly";
+  const smtpFrom = process.env.SMTP_FROM || `"${senderName}" <no-reply@pahadily.com>`;
 
   const notif: EmailNotification = {
     id: nextNotificationId++,
@@ -729,33 +852,425 @@ async function dispatchEmailNotification(
           user: smtpUser,
           pass: smtpPass,
         },
+        tls: {
+          rejectUnauthorized: false,
+        },
+        connectionTimeout: 8000,
+        greetingTimeout: 5000,
       });
 
-      await transporter.sendMail({
+      const defaultHtml = `<div style="font-family:sans-serif;padding:24px;background-color:#FAF8F2;color:#0C2017;"><div style="background-color:#10251D;padding:20px;border-radius:10px;text-align:center;"><h2 style="color:#FAF8F2;margin:0;">Pahadíly</h2><p style="color:#8EE49A;margin:4px 0 0 0;font-size:12px;">Himalayan Discovery</p></div><div style="background:#FFF;padding:20px;border-radius:10px;margin-top:16px;border:1px solid rgba(16,38,29,0.1);"><p style="font-size:15px;line-height:1.6;">${bodyText || subject}</p></div></div>`;
+
+      const info = await transporter.sendMail({
         from: smtpFrom,
         to: recipientEmail,
         subject,
         text: bodyText || subject,
-        html: `<div style="font-family:sans-serif;padding:20px;color:#10251D;"><h2 style="color:#174D39;">Pahadíly</h2><p>${bodyText || subject}</p></div>`,
+        html: htmlContent || defaultHtml,
       });
 
-      notif.status = "sent";
-      notif.preview = `Dispatched successfully to ${recipientEmail}`;
+      // Nodemailer handoff to SMTP server accepted
+      notif.status = "accepted";
+      notif.preview = `Accepted by SMTP server for delivery to ${recipientEmail} (MsgID: ${info.messageId || "ok"})`;
     } catch (err: any) {
       console.warn(`[Email] SMTP delivery failed for ${recipientEmail}:`, err?.message);
       notif.status = "failed";
-      notif.preview = `Delivery error: ${err?.message || "SMTP dispatch error"}`;
+      notif.preview = `SMTP dispatch error: ${err?.message || "Delivery rejected"}`;
     }
   } else {
-    // Honest reporting: SMTP is unconfigured. Never claim 'sent'!
+    // Honest reporting: SMTP is unconfigured. Never claim 'sent' or 'delivered'!
     notif.status = "unavailable";
-    notif.preview = `Email notification recorded. Outgoing SMTP service is not configured in this environment.`;
+    notif.preview = `Outgoing SMTP service is not configured in this environment. Notification recorded.`;
   }
 
   emailNotifications.push(notif);
   saveDbState();
   return notif;
 }
+
+// --- Reusable HTML & Text Email Template Generator ---
+function renderStayEmailContent(params: {
+  booking: Booking;
+  location?: LocationItem | Place | null;
+  siteUrl: string;
+  headlineTitle: string;
+  badgeText: string;
+  badgeBg: string;
+  badgeColor: string;
+  statusLabel: string;
+  statusColor: string;
+  introMessage: string;
+}) {
+  const {
+    booking,
+    location,
+    siteUrl,
+    headlineTitle,
+    badgeText,
+    badgeBg,
+    badgeColor,
+    statusLabel,
+    statusColor,
+    introMessage,
+  } = params;
+
+  const propertyName = booking.item_title || (location as any)?.name || "Himalayan Homestay";
+  const hostName = booking.provider_name || (location as any)?.host_name || (location as any)?.name || "Local Village Host";
+
+  const locationParts: string[] = [];
+  if ((location as any)?.village) locationParts.push((location as any).village);
+  if ((location as any)?.valley) locationParts.push(`${(location as any).valley} Valley`);
+  if ((location as any)?.district) locationParts.push((location as any).district);
+  if ((location as any)?.region && locationParts.length === 0) locationParts.push((location as any).region);
+  const stayLocationStr = locationParts.length > 0 ? locationParts.join(", ") : "Himachal Pradesh, India";
+
+  const numNights = Math.max(1, Number(booking.nights) || 1);
+  const checkOutDate = booking.end_date || "Next day";
+  const voucherRef = booking.transaction_ref || booking.payment_id || `PHD-STAY-${booking.id}`;
+  const mealPlan = booking.activity_type || "Traditional Homestay Living";
+  const paymentSettlement = booking.payment_method === "pay_on_meetup"
+    ? "Pay Direct to Host on Meetup / Arrival (Cash or UPI)"
+    : String(booking.payment_method);
+
+  const textBody = `
+PAHADÍLY — HIMALAYAN HOMESTAY RESERVATION NOTICE
+================================================
+Voucher / Reference ID: #${booking.id} (${voucherRef})
+Status: ${statusLabel}
+
+Dear ${booking.traveler_name},
+
+${introMessage}
+
+STAY DETAILS
+------------
+Property: ${propertyName}
+Host: ${hostName}
+Location: ${stayLocationStr}
+Check-in: ${booking.travel_date} (from 12:00 PM)
+Check-out: ${checkOutDate} (by 11:00 AM)
+Duration: ${numNights} Night(s)
+Guests: ${booking.guests} Traveler(s)
+Hospitality Plan: ${mealPlan}
+Total Honorarium: ${booking.total_price || "₹1,800"}
+Platform Fee: ₹0 (100% goes directly to the community)
+Payment Settlement: ${paymentSettlement}
+
+HOST & TRAVELER COORDINATION
+----------------------------
+Host Name: ${hostName}
+Primary Traveler: ${booking.traveler_name}
+Traveler Email: ${booking.traveler_email}
+Traveler Phone: ${booking.traveler_phone || "Not provided"}
+Special Requests: ${booking.message || "None"}
+
+HIMALAYAN HOMESTAY LIVING GUIDELINES
+------------------------------------
+1. Kath-Kuni Architecture: Traditional timber-and-stone homes stay naturally insulated. Please remove outdoor footwear at the wooden threshold.
+2. Zero-Waste Commitment: Please carry all non-biodegradable plastics back down to major roadheads. Leave no plastics in village streams.
+3. Fresh Local Meals: Dishes are freshly prepared on traditional wood-fired hearths with local mountain grains, lentils, and garden greens.
+
+View and manage your reservation anytime at: ${siteUrl}/my-bookings
+
+Warm regards from the mountains,
+The Pahadíly Community & Your Local Host
+support@pahadily.com • Himachal Pradesh, India
+`.trim();
+
+  const htmlBody = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(headlineTitle)} - Pahadíly</title>
+</head>
+<body style="margin:0;padding:0;background-color:#FAF8F2;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0C2017;-webkit-font-smoothing:antialiased;">
+  <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#FAF8F2;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width:620px;background-color:#FFFFFF;border-radius:16px;overflow:hidden;border:1px solid rgba(16,38,29,0.08);box-shadow:0 8px 24px rgba(12,32,23,0.06);">
+          
+          <!-- Brand Header -->
+          <tr>
+            <td style="background-color:#10251D;padding:36px 32px 28px 32px;text-align:center;">
+              <div style="color:#8EE49A;font-size:11px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;margin-bottom:8px;">
+                PAHADÍLY • HIMALAYAN HOMESTAYS & RETREATS
+              </div>
+              <h1 style="color:#FAF8F2;font-family:Georgia,serif;font-size:24px;font-weight:700;margin:0 0 10px 0;letter-spacing:-0.01em;">
+                ${escapeHtml(headlineTitle)}
+              </h1>
+              <div style="display:inline-block;background-color:${badgeBg};border:1px solid rgba(142,228,154,0.35);color:${badgeColor};padding:5px 16px;border-radius:9999px;font-size:12px;font-weight:700;">
+                ${escapeHtml(badgeText)}
+              </div>
+            </td>
+          </tr>
+
+          <!-- Main Content -->
+          <tr>
+            <td style="padding:32px;">
+              <p style="font-size:15px;line-height:1.6;color:#2D4438;margin:0 0 16px 0;">
+                Dear <strong>${escapeHtml(booking.traveler_name)}</strong>,
+              </p>
+              <p style="font-size:14.5px;line-height:1.65;color:#2D4438;margin:0 0 24px 0;">
+                ${escapeHtml(introMessage)}
+              </p>
+
+              <!-- Reservation Summary Card -->
+              <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#F7F5EE;border-radius:12px;border:1px solid rgba(16,38,29,0.08);margin-bottom:28px;">
+                <tr>
+                  <td style="padding:22px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                      <span style="font-size:11px;font-weight:700;color:#688575;text-transform:uppercase;letter-spacing:0.12em;">
+                        STAY RESERVATION DETAILS
+                      </span>
+                      <span style="font-size:12px;font-weight:700;color:${statusColor};">
+                        ${escapeHtml(statusLabel)}
+                      </span>
+                    </div>
+
+                    <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">
+                      <tr>
+                        <td style="padding:6px 0;font-size:13.5px;color:#536B5E;width:40%;">Property:</td>
+                        <td style="padding:6px 0;font-size:14px;font-weight:700;color:#0C2017;text-align:right;">${escapeHtml(propertyName)}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:6px 0;font-size:13.5px;color:#536B5E;">Village / Region:</td>
+                        <td style="padding:6px 0;font-size:13.5px;font-weight:600;color:#0C2017;text-align:right;">${escapeHtml(stayLocationStr)}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:6px 0;font-size:13.5px;color:#536B5E;">Check-in:</td>
+                        <td style="padding:6px 0;font-size:13.5px;font-weight:700;color:#174D39;text-align:right;">${escapeHtml(booking.travel_date)} (from 12:00 PM)</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:6px 0;font-size:13.5px;color:#536B5E;">Check-out:</td>
+                        <td style="padding:6px 0;font-size:13.5px;font-weight:700;color:#174D39;text-align:right;">${escapeHtml(checkOutDate)} (by 11:00 AM)</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:6px 0;font-size:13.5px;color:#536B5E;">Duration:</td>
+                        <td style="padding:6px 0;font-size:13.5px;font-weight:600;color:#0C2017;text-align:right;">${numNights} Night(s)</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:6px 0;font-size:13.5px;color:#536B5E;">Travelers:</td>
+                        <td style="padding:6px 0;font-size:13.5px;font-weight:600;color:#0C2017;text-align:right;">${escapeHtml(booking.guests)} Guest(s)</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:6px 0;font-size:13.5px;color:#536B5E;">Hospitality Option:</td>
+                        <td style="padding:6px 0;font-size:13.5px;font-weight:600;color:#0C2017;text-align:right;">${escapeHtml(mealPlan)}</td>
+                      </tr>
+                      <tr style="border-top:1px dashed rgba(16,38,29,0.15);">
+                        <td style="padding:10px 0 4px 0;font-size:14px;font-weight:700;color:#0C2017;">Total Honorarium:</td>
+                        <td style="padding:10px 0 4px 0;font-size:18px;font-weight:800;color:#174D39;text-align:right;">${escapeHtml(booking.total_price || "₹1,800")}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:2px 0;font-size:12px;color:#688575;">Platform Fee:</td>
+                        <td style="padding:2px 0;font-size:12px;font-weight:600;color:#205540;text-align:right;">₹0 (Fair Community Model)</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:2px 0;font-size:12px;color:#688575;">Payment Settlement:</td>
+                        <td style="padding:2px 0;font-size:12px;font-weight:600;color:#688575;text-align:right;">${escapeHtml(paymentSettlement)}</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Host & Arrival Info -->
+              <div style="font-size:12px;font-weight:700;color:#10251D;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px;">
+                Host & Arrival Coordination
+              </div>
+              <div style="background-color:#FFFFFF;border:1px solid rgba(16,38,29,0.1);border-radius:10px;padding:16px;margin-bottom:24px;">
+                <div style="font-size:13.5px;color:#2D4438;margin-bottom:6px;">
+                  <strong>Local Host:</strong> ${escapeHtml(hostName)}
+                </div>
+                <div style="font-size:13.5px;color:#2D4438;margin-bottom:6px;">
+                  <strong>Primary Guest:</strong> ${escapeHtml(booking.traveler_name)} • ${escapeHtml(booking.traveler_phone || "Phone not specified")}
+                </div>
+                <div style="font-size:13.5px;color:#2D4438;margin-bottom:6px;">
+                  <strong>Registered Email:</strong> ${escapeHtml(booking.traveler_email)}
+                </div>
+                ${booking.message ? `<div style="font-size:13px;color:#536B5E;margin-top:6px;font-style:italic;"><strong>Guest Notes:</strong> "${escapeHtml(booking.message)}"</div>` : ""}
+              </div>
+
+              <!-- Community Etiquette Section -->
+              <div style="background-color:rgba(32,85,64,0.05);border-left:4px solid #205540;padding:16px;border-radius:0 10px 10px 0;margin-bottom:28px;">
+                <div style="font-size:12.5px;font-weight:700;color:#205540;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">
+                  🌿 Himalayan Homestay Guidelines
+                </div>
+                <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.65;color:#355344;">
+                  <li><strong>Kath-Kuni Heritage:</strong> Our partner homes are built with native deodar timber and dry stone. Please remove shoes when entering interior living quarters.</li>
+                  <li><strong>Zero-Waste Responsibility:</strong> Carry all non-biodegradable plastics back down to town roadheads. Do not leave packaging in village streams.</li>
+                  <li><strong>Mountain Hospitality:</strong> Meals are freshly prepared on traditional wood-fired hearths with local mountain grains, lentils, and garden greens.</li>
+                </ul>
+              </div>
+
+              <!-- CTA Button -->
+              <div style="text-align:center;margin:32px 0 16px 0;">
+                <a href="${siteUrl}/my-bookings" target="_blank" style="display:inline-block;background-color:#174D39;color:#FFFFFF;padding:13px 30px;border-radius:9999px;font-size:14px;font-weight:700;text-decoration:none;letter-spacing:0.02em;">
+                  View Your Reservation on Pahadíly →
+                </a>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#F7F5EE;padding:24px 32px;border-top:1px solid rgba(16,38,29,0.06);text-align:center;">
+              <p style="margin:0 0 6px 0;font-size:12px;color:#688575;font-weight:600;">
+                Pahadíly Automated Stay Notification Service • Rare Places. Real People. Lasting Stories.
+              </p>
+              <p style="margin:0;font-size:11.5px;color:#8A9F92;">
+                Himachal Pradesh, India • This email was sent to ${escapeHtml(booking.traveler_email)}.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  return { textBody, htmlBody };
+}
+
+// 1. Initial Stay Request Received (Pending Host Review)
+async function dispatchStayRequestReceivedEmail(
+  booking: Booking,
+  location?: LocationItem | Place | null,
+  req?: Request
+): Promise<EmailNotification> {
+  const propertyName = booking.item_title || (location as any)?.name || "Himalayan Homestay";
+  const hostName = booking.provider_name || (location as any)?.host_name || "Local Host";
+  const siteUrl = getSiteUrl(req);
+
+  const { textBody, htmlBody } = renderStayEmailContent({
+    booking,
+    location,
+    siteUrl,
+    headlineTitle: "Stay Reservation Request Received",
+    badgeText: `Voucher #${booking.id} • Pending Host Acceptance`,
+    badgeBg: "rgba(217, 154, 56, 0.25)",
+    badgeColor: "#8a580a",
+    statusLabel: "⏳ Pending Host Review",
+    statusColor: "#99630c",
+    introMessage: `Your reservation request for ${propertyName} has been received and dispatched to your host, ${hostName}. Once your host accepts the dates, an official confirmed stay voucher will be issued.`,
+  });
+
+  return dispatchEmailNotification(
+    booking.traveler_email,
+    booking.traveler_name,
+    `Stay Request Received: ${propertyName} (Pending Host Review) | Pahadíly #${booking.id}`,
+    "stay_request_received",
+    booking.id,
+    textBody,
+    htmlBody
+  );
+}
+
+// 2. Stay Booking Confirmed by Host (Confirmed Voucher Issued)
+async function dispatchStayBookingConfirmedEmail(
+  booking: Booking,
+  location?: LocationItem | Place | null,
+  req?: Request
+): Promise<EmailNotification> {
+  const propertyName = booking.item_title || (location as any)?.name || "Himalayan Homestay";
+  const hostName = booking.provider_name || (location as any)?.host_name || "Local Host";
+  const siteUrl = getSiteUrl(req);
+
+  const { textBody, htmlBody } = renderStayEmailContent({
+    booking,
+    location,
+    siteUrl,
+    headlineTitle: "Stay Reservation Confirmed",
+    badgeText: `✓ Confirmed Voucher #${booking.id}`,
+    badgeBg: "rgba(142, 228, 154, 0.25)",
+    badgeColor: "#174D39",
+    statusLabel: "✓ Confirmed by Host",
+    statusColor: "#174D39",
+    introMessage: `Great news! Your stay at ${propertyName} has been officially confirmed by your host, ${hostName}. Your room is reserved for your dates. Below is your official stay voucher and arrival instructions.`,
+  });
+
+  return dispatchEmailNotification(
+    booking.traveler_email,
+    booking.traveler_name,
+    `Confirmed: Stay Reservation at ${propertyName} | Pahadíly Voucher #${booking.id}`,
+    "stay_confirmed",
+    booking.id,
+    textBody,
+    htmlBody
+  );
+}
+
+// 3. Stay Booking Declined by Provider
+async function dispatchStayBookingDeclinedEmail(
+  booking: Booking,
+  location?: LocationItem | Place | null,
+  req?: Request
+): Promise<EmailNotification> {
+  const propertyName = booking.item_title || (location as any)?.name || "Himalayan Homestay";
+  const hostName = booking.provider_name || "Local Host";
+  const siteUrl = getSiteUrl(req);
+
+  const { textBody, htmlBody } = renderStayEmailContent({
+    booking,
+    location,
+    siteUrl,
+    headlineTitle: "Stay Request Update: Dates Unavailable",
+    badgeText: `Request #${booking.id} • Unavailable`,
+    badgeBg: "rgba(200, 109, 81, 0.2)",
+    badgeColor: "#a3391b",
+    statusLabel: "✕ Dates Unavailable",
+    statusColor: "#a3391b",
+    introMessage: `Your host, ${hostName}, was unable to accept your stay reservation request for ${propertyName} on the requested dates. Provider note: ${booking.provider_notes || "Host was unavailable."}${booking.suggested_date ? ` Suggested alternate date: ${booking.suggested_date}` : ""}`,
+  });
+
+  return dispatchEmailNotification(
+    booking.traveler_email,
+    booking.traveler_name,
+    `Update on Stay Request: ${propertyName} | Pahadíly #${booking.id}`,
+    "stay_declined",
+    booking.id,
+    textBody,
+    htmlBody
+  );
+}
+
+// 4. Stay Booking Cancelled
+async function dispatchStayBookingCancelledEmail(
+  booking: Booking,
+  location?: LocationItem | Place | null,
+  req?: Request
+): Promise<EmailNotification> {
+  const propertyName = booking.item_title || "Himalayan Homestay";
+  const siteUrl = getSiteUrl(req);
+
+  const { textBody, htmlBody } = renderStayEmailContent({
+    booking,
+    location,
+    siteUrl,
+    headlineTitle: "Stay Reservation Cancelled",
+    badgeText: `Voucher #${booking.id} • Cancelled`,
+    badgeBg: "rgba(100, 100, 100, 0.2)",
+    badgeColor: "#555555",
+    statusLabel: "Cancelled",
+    statusColor: "#555555",
+    introMessage: `Your stay reservation for ${propertyName} (Voucher #${booking.id}) has been cancelled. If payment was made, your refund has been processed in accordance with our community policy.`,
+  });
+
+  return dispatchEmailNotification(
+    booking.traveler_email,
+    booking.traveler_name,
+    `Stay Reservation Cancelled: ${propertyName} | Pahadíly #${booking.id}`,
+    "stay_cancelled",
+    booking.id,
+    textBody,
+    htmlBody
+  );
+}
+
+// Backwards-compatible alias
+const dispatchStayBookingConfirmationEmail = dispatchStayBookingConfirmedEmail;
 
 // --- Express App Setup ---
 const app = express();
@@ -1050,7 +1565,44 @@ app.get("/api/categories", (req, res) => {
   if (!includeAll) {
     cats = cats.filter((c) => c.is_active);
   }
-  res.json(cats);
+
+  const publishedLocs = Array.from(locations.values()).filter((l) => l.status === "published");
+
+  const results = cats.map((cat) => {
+    const locsInCat = publishedLocs.filter(
+      (l) => (l.category || "").toLowerCase() === cat.id.toLowerCase()
+    );
+    const firstWithImg = locsInCat.find((l) => l.cover_image || (l.gallery && l.gallery.length > 0));
+    const sampleImage = firstWithImg ? (firstWithImg.cover_image || firstWithImg.gallery[0]?.url) : null;
+    const sampleName = firstWithImg ? firstWithImg.name : (locsInCat[0]?.name || null);
+
+    return {
+      ...cat,
+      published_count: locsInCat.length,
+      sample_image: sampleImage,
+      sample_location_name: sampleName,
+    };
+  });
+
+  res.json(results);
+});
+
+// Real platform discovery statistics endpoint
+app.get("/api/discovery/stats", (_req, res) => {
+  const publishedLocs = Array.from(locations.values()).filter((l) => l.status === "published");
+  const approvedCompanions = Array.from(users.values()).filter((u) => ["host", "guide"].includes(u.role));
+  const certifiedGuides = Array.from(locals.values()).filter((l) => l.certified).length;
+  const publishedStays = publishedLocs.filter(
+    (l) => l.category === "homestays" || l.category === "villages" || (Array.isArray(l.tags) && l.tags.some((t) => t.toLowerCase().includes("stay") || t.toLowerCase().includes("homestay")))
+  ).length;
+
+  res.json({
+    published_locations: publishedLocs.length,
+    approved_companions: approvedCompanions.length,
+    certified_guides: certifiedGuides,
+    published_experiences: experiences.size,
+    published_homestays: publishedStays,
+  });
 });
 
 app.post("/api/categories", authMiddleware(), (req: AuthenticatedRequest, res) => {
@@ -1752,111 +2304,199 @@ app.get("/api/locals/:id/busy-dates", (req, res) => {
   res.json(busySlots);
 });
 
-// --- Bookings Endpoints (Strict Validation & Conflict Prevention) ---
-app.post("/api/bookings", authMiddleware(true), (req: AuthenticatedRequest, res) => {
+// --- Bookings Endpoints (Strict Validation, Server-Side Recalculation & Lifecycle) ---
+app.post("/api/bookings", authMiddleware(true), async (req: AuthenticatedRequest, res) => {
   const body = req.body;
 
-  // 1. Validate required fields
+  // 1. Validate required traveler inputs
   const travelerName = String(body.traveler_name || req.user?.full_name || "").trim();
   const travelerEmail = String(body.traveler_email || req.user?.email || "").trim().toLowerCase();
   const travelDate = String(body.travel_date || "").trim();
-  const guestsNum = parseInt(String(body.guests || "1"), 10);
+  const rawGuests = parseInt(String(body.guests || "1"), 10);
   const itemId = Number(body.item_id);
 
-  if (!travelerName) {
-    return res.status(400).json({ detail: "Traveler name is required." });
+  if (!travelerName || travelerName.length < 2 || travelerName.length > 100) {
+    return res.status(400).json({ detail: "A valid traveler name (2-100 characters) is required." });
   }
-  if (!travelerEmail || !travelerEmail.includes("@") || !travelerEmail.includes(".")) {
-    return res.status(400).json({ detail: "A valid traveler email address is required." });
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!travelerEmail || !emailRegex.test(travelerEmail)) {
+    return res.status(400).json({ detail: "A valid traveler email address is required for voucher delivery." });
   }
-  if (!travelDate) {
-    return res.status(400).json({ detail: "A valid travel date is required." });
+
+  // Strict Calendar Date Format & Boundary Validation
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(travelDate)) {
+    return res.status(400).json({ detail: "Travel date must be formatted as YYYY-MM-DD." });
   }
-  if (isNaN(guestsNum) || guestsNum < 1 || guestsNum > 20) {
-    return res.status(400).json({ detail: "Guests count must be a valid number between 1 and 20." });
+  const [ty, tm, td] = travelDate.split("-").map(Number);
+  const parsedTravelDate = new Date(Date.UTC(ty, tm - 1, td));
+  if (
+    isNaN(parsedTravelDate.getTime()) ||
+    parsedTravelDate.getUTCFullYear() !== ty ||
+    parsedTravelDate.getUTCMonth() !== tm - 1 ||
+    parsedTravelDate.getUTCDate() !== td
+  ) {
+    return res.status(400).json({ detail: "The specified travel date is an invalid calendar day." });
   }
+
+  const todayUtcStr = new Date().toISOString().slice(0, 10);
+  if (travelDate < todayUtcStr) {
+    return res.status(400).json({ detail: "Travel date cannot be in the past." });
+  }
+
+  if (isNaN(rawGuests) || rawGuests < 1 || rawGuests > 20) {
+    return res.status(400).json({ detail: "Party size must be a valid number of travelers between 1 and 20." });
+  }
+  const guestsNum = Math.min(20, Math.max(1, rawGuests));
+
   if (!itemId || isNaN(itemId)) {
     return res.status(400).json({ detail: "Valid item_id is required." });
   }
 
-  // Check item existence
   const bookingType = body.booking_type || "companion";
+  const timeSlot = body.time_slot || (bookingType === "stay" ? "overnight" : "full_day");
+
+  // Prevent duplicate submissions from double clicks or network retries (60-second window)
+  const duplicateWindow = Date.now() - 60 * 1000;
+  const existingRecentBooking = Array.from(bookings.values()).find(
+    (b) =>
+      b.traveler_email.toLowerCase() === travelerEmail &&
+      b.item_id === itemId &&
+      b.travel_date === travelDate &&
+      b.time_slot === timeSlot &&
+      b.booking_type === bookingType &&
+      new Date(b.created_at).getTime() > duplicateWindow
+  );
+  if (existingRecentBooking) {
+    return res.status(200).json(existingRecentBooking);
+  }
+
+  // Look up genuine catalog items
   let matchedLocal: Local | undefined;
   let matchedPlace: Place | undefined;
   let matchedExp: Experience | undefined;
+  let matchedLocation: LocationItem | undefined;
 
   if (["companion", "guide", "local"].includes(bookingType)) {
     matchedLocal = locals.get(itemId);
   } else if (bookingType === "experience") {
     matchedExp = experiences.get(itemId);
+  } else if (bookingType === "stay") {
+    matchedLocation = locations.get(itemId);
+    if (!matchedLocation) matchedPlace = places.get(itemId);
   } else {
     matchedPlace = places.get(itemId);
+    matchedLocation = locations.get(itemId);
   }
 
-  const timeSlot = body.time_slot || "full_day";
-
   // Double-booking conflict validation on confirmed reservations
-  if (hasBookingConflict(itemId, travelDate, timeSlot)) {
+  if (hasBookingConflict(itemId, travelDate, timeSlot, undefined, bookingType)) {
     return res.status(409).json({
-      detail: `This provider or experience is already booked and confirmed on ${travelDate} (${timeSlot}). Please choose another date or time slot.`,
+      detail: `This provider or stay is already booked and confirmed on ${travelDate} (${timeSlot}). Please choose another date.`,
       conflict: true,
     });
   }
 
   const providerName =
     body.provider_name ||
+    (matchedLocation as any)?.host_name ||
+    matchedLocation?.name ||
+    matchedPlace?.host_name ||
+    matchedPlace?.name ||
     matchedLocal?.name ||
     matchedExp?.guide ||
-    matchedPlace?.host_name ||
     body.item_title ||
-    "Local Provider";
+    (bookingType === "stay" ? "Local Homestay Host" : "Local Provider");
 
   const payId = body.payment_id || `PHD-REQ-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
   const txnRef = body.transaction_ref || `REQ-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
+  // Server-side recalculation of dates, duration, party size & price
+  let stayNights = 1;
+  let stayEndDate: string | null = null;
+  let calculatedTotalPrice: string;
+
+  if (bookingType === "stay") {
+    const pricing = calculateStayPricingAndDates(
+      travelDate,
+      body.nights,
+      guestsNum,
+      matchedLocation,
+      matchedPlace
+    );
+    stayNights = pricing.nights;
+    stayEndDate = pricing.end_date;
+    calculatedTotalPrice = pricing.total_price;
+  } else if (bookingType === "experience") {
+    const expBase = parseItemPrice(matchedExp?.price, 1200);
+    calculatedTotalPrice = `₹${(expBase * guestsNum).toLocaleString("en-IN")}`;
+  } else {
+    const compBase = parseItemPrice(matchedLocal?.price, 1500);
+    calculatedTotalPrice = `₹${compBase.toLocaleString("en-IN")}`;
+  }
+
+  // Consistent booking lifecycle: All new reservation requests start as 'pending'
+  // Stay bookings require host review before an official confirmed voucher is issued.
   const newBooking: Booking = {
     id: nextBookingId++,
     booking_type: bookingType,
     item_id: itemId,
-    item_title: body.item_title || matchedLocal?.name || matchedExp?.title || matchedPlace?.name || "Himalayan Experience",
-    item_image: body.item_image || matchedLocal?.image || matchedExp?.image || matchedPlace?.image || null,
+    item_title: body.item_title || matchedLocation?.name || matchedPlace?.name || matchedLocal?.name || matchedExp?.title || (bookingType === "stay" ? "Himalayan Homestay" : "Himalayan Experience"),
+    item_image: body.item_image || matchedLocation?.cover_image || matchedPlace?.image || matchedLocal?.image || matchedExp?.image || null,
     user_id: req.user?.id || null,
     traveler_name: travelerName,
     traveler_email: travelerEmail,
     traveler_phone: body.traveler_phone || req.user?.phone || null,
     travel_date: travelDate,
-    end_date: body.end_date || null,
+    end_date: stayEndDate,
     time_slot: timeSlot,
-    activity_type: body.activity_type || "Valley Discovery",
+    activity_type: body.activity_type || (bookingType === "stay" ? "Authentic Homestay Living" : "Valley Discovery"),
     guests: String(guestsNum),
-    nights: Math.max(1, Number(body.nights) || 1),
-    total_price: body.total_price || matchedLocal?.price || matchedExp?.price || matchedPlace?.price || "₹500",
+    nights: stayNights,
+    total_price: calculatedTotalPrice,
     payment_method: body.payment_method || "pay_on_meetup",
     payment_status: "pending",
     payment_id: payId,
     transaction_ref: txnRef,
-    message: body.message || "",
-    status: "pending", // Always pending provider review
-    provider_id: matchedLocal?.id || null,
+    message: String(body.message || "").trim(),
+    status: "pending",
+    provider_id: matchedLocation?.id || matchedPlace?.id || matchedLocal?.id || null,
     provider_name: providerName,
     provider_notes: null,
     suggested_date: null,
     created_at: new Date().toISOString(),
   };
 
+  // 1. Ensure booking persistence succeeds independently of SMTP delivery
   bookings.set(newBooking.id, newBooking);
   saveDbState();
 
-  dispatchEmailNotification(
-    newBooking.traveler_email,
-    newBooking.traveler_name,
-    `Request Submitted: ${newBooking.item_title} | Pahadíly #${newBooking.id}`,
-    "booking_request_submitted",
-    newBooking.id,
-    `Your request for ${newBooking.item_title} on ${travelDate} has been sent to provider ${providerName}.`
-  );
+  // 2. Safe email notification dispatch (isolated error boundary)
+  let emailNotif: EmailNotification | null = null;
+  try {
+    if (bookingType === "stay") {
+      emailNotif = await dispatchStayRequestReceivedEmail(newBooking, matchedLocation || matchedPlace, req);
+    } else {
+      emailNotif = await dispatchEmailNotification(
+        newBooking.traveler_email,
+        newBooking.traveler_name,
+        `Request Submitted: ${newBooking.item_title} | Pahadíly #${newBooking.id}`,
+        "booking_request_submitted",
+        newBooking.id,
+        `Your request for ${newBooking.item_title} on ${travelDate} has been sent to provider ${providerName}.`
+      );
+    }
+  } catch (err: any) {
+    console.warn(`[Booking] Non-fatal notification dispatch issue for #${newBooking.id}:`, err?.message);
+  }
 
-  res.status(201).json(newBooking);
+  // Return the persisted booking along with genuine email dispatch status
+  res.status(201).json({
+    ...newBooking,
+    email_delivery: {
+      status: emailNotif?.status || (process.env.SMTP_HOST ? "failed" : "unavailable"),
+      message: emailNotif?.preview || "Notification recorded in system",
+    },
+  });
 });
 
 // Traveler Bookings endpoint: Strictly isolated to authenticated user
@@ -1892,7 +2532,7 @@ app.get("/api/bookings/provider-requests", authMiddleware(), (req: Authenticated
   res.json(result);
 });
 
-// All Bookings (Admin Console): Strictly restricted
+// All Bookings (Admin Console / Assigned Providers): Strictly role-enforced
 app.get("/api/bookings", authMiddleware(), (req: AuthenticatedRequest, res) => {
   const user = req.user!;
   if (user.role === "traveler") {
@@ -1906,7 +2546,6 @@ app.get("/api/bookings", authMiddleware(), (req: AuthenticatedRequest, res) => {
   );
 
   if (user.role !== "admin") {
-    // Hosts and companions only see bookings assigned to them
     const uName = user.full_name.toLowerCase();
     result = result.filter(
       (b) =>
@@ -1935,8 +2574,28 @@ app.get("/api/bookings", authMiddleware(), (req: AuthenticatedRequest, res) => {
   res.json(result);
 });
 
-// Provider Accept / Decline endpoint with conflict guard
-app.patch("/api/bookings/:id/respond", authMiddleware(), (req: AuthenticatedRequest, res) => {
+// Single Booking Details endpoint: Role-isolated
+app.get("/api/bookings/:id", authMiddleware(), (req: AuthenticatedRequest, res) => {
+  const id = Number(req.params.id);
+  const booking = bookings.get(id);
+  if (!booking) return res.status(404).json({ detail: "Booking not found" });
+
+  const user = req.user!;
+  const isOwner = booking.user_id === user.id || booking.traveler_email.toLowerCase() === user.email.toLowerCase();
+  const isAssigned =
+    user.role === "admin" ||
+    booking.provider_id === user.id ||
+    (booking.provider_name && user.full_name && booking.provider_name.toLowerCase().includes(user.full_name.toLowerCase()));
+
+  if (!isOwner && !isAssigned && user.role !== "admin") {
+    return res.status(403).json({ detail: "Access denied. You do not have permission to view this booking." });
+  }
+
+  res.json(booking);
+});
+
+// Provider Accept / Decline endpoint with conflict guard & notification deduplication
+app.patch("/api/bookings/:id/respond", authMiddleware(), async (req: AuthenticatedRequest, res) => {
   const id = Number(req.params.id);
   const booking = bookings.get(id);
   if (!booking) return res.status(404).json({ detail: "Booking request not found" });
@@ -1959,7 +2618,12 @@ app.patch("/api/bookings/:id/respond", authMiddleware(), (req: AuthenticatedRequ
   }
 
   if (decision === "accept") {
-    if (hasBookingConflict(booking.item_id, booking.travel_date, booking.time_slot, booking.id)) {
+    // Idempotency: If already confirmed, do not re-send confirmation emails
+    if (booking.status === "confirmed") {
+      return res.json(booking);
+    }
+
+    if (hasBookingConflict(booking.item_id, booking.travel_date, booking.time_slot, booking.id, booking.booking_type)) {
       return res.status(409).json({
         detail: `Cannot accept: Another booking is already confirmed for this provider on ${booking.travel_date} (${booking.time_slot}).`,
         conflict: true,
@@ -1970,35 +2634,56 @@ app.patch("/api/bookings/:id/respond", authMiddleware(), (req: AuthenticatedRequ
     booking.provider_notes = notes || "Booking request accepted! See you in the mountains.";
     saveDbState();
 
-    dispatchEmailNotification(
-      booking.traveler_email,
-      booking.traveler_name,
-      `Confirmed! Your booking with ${booking.provider_name} is accepted | #${booking.id}`,
-      "booking_confirmed_by_provider",
-      booking.id,
-      `Your booking #${booking.id} has been confirmed by ${booking.provider_name}. Notes: ${booking.provider_notes}`
-    );
+    try {
+      if (booking.booking_type === "stay") {
+        await dispatchStayBookingConfirmedEmail(booking, locations.get(booking.item_id) || places.get(booking.item_id), req);
+      } else {
+        await dispatchEmailNotification(
+          booking.traveler_email,
+          booking.traveler_name,
+          `Confirmed! Your booking with ${booking.provider_name} is accepted | #${booking.id}`,
+          "booking_confirmed_by_provider",
+          booking.id,
+          `Your booking #${booking.id} has been confirmed by ${booking.provider_name}. Notes: ${booking.provider_notes}`
+        );
+      }
+    } catch (err: any) {
+      console.warn(`[Respond Accept] Non-fatal email error for #${booking.id}:`, err?.message);
+    }
   } else {
+    // Idempotency: If already declined, do not re-send decline emails
+    if (booking.status === "declined") {
+      return res.json(booking);
+    }
+
     booking.status = "declined";
     booking.provider_notes = notes || "Provider was unavailable on this date.";
     booking.suggested_date = suggested_date || null;
     saveDbState();
 
-    dispatchEmailNotification(
-      booking.traveler_email,
-      booking.traveler_name,
-      `Update on your Pahadíly request #${booking.id}`,
-      "booking_declined",
-      booking.id,
-      `Provider declined request #${booking.id}. Notes: ${booking.provider_notes}`
-    );
+    try {
+      if (booking.booking_type === "stay") {
+        await dispatchStayBookingDeclinedEmail(booking, locations.get(booking.item_id) || places.get(booking.item_id), req);
+      } else {
+        await dispatchEmailNotification(
+          booking.traveler_email,
+          booking.traveler_name,
+          `Update on your Pahadíly request #${booking.id}`,
+          "booking_declined",
+          booking.id,
+          `Provider declined request #${booking.id}. Notes: ${booking.provider_notes}`
+        );
+      }
+    } catch (err: any) {
+      console.warn(`[Respond Decline] Non-fatal email error for #${booking.id}:`, err?.message);
+    }
   }
 
   res.json(booking);
 });
 
-// Booking status update (Cancellation / Completion)
-app.patch("/api/bookings/:id/status", authMiddleware(), (req: AuthenticatedRequest, res) => {
+// Booking status update (Cancellation / Completion) with RBAC & notification deduplication
+app.patch("/api/bookings/:id/status", authMiddleware(), async (req: AuthenticatedRequest, res) => {
   const id = Number(req.params.id);
   const booking = bookings.get(id);
   if (!booking) return res.status(404).json({ detail: "Booking not found" });
@@ -2018,13 +2703,42 @@ app.patch("/api/bookings/:id/status", authMiddleware(), (req: AuthenticatedReque
     if (newStatus !== "cancelled") {
       return res.status(403).json({ detail: "Travelers can only cancel their bookings." });
     }
+  } else if (user.role !== "admin") {
+    // Hosts and companions can only update status of their assigned bookings
+    const isAssigned =
+      booking.provider_id === user.id ||
+      (booking.provider_name && booking.provider_name.toLowerCase().includes(user.full_name.toLowerCase()));
+    if (!isAssigned) {
+      return res.status(403).json({ detail: "Not authorized to update this provider's booking status." });
+    }
   }
 
+  // Idempotency check: No repeated actions or duplicate notifications if status is unchanged
+  if (booking.status === newStatus) {
+    return res.json(booking);
+  }
+
+  const prevStatus = booking.status;
   booking.status = newStatus;
   if (newStatus === "cancelled" && booking.payment_status === "paid") {
     booking.payment_status = "refunded";
   }
   saveDbState();
+
+  try {
+    if (newStatus === "confirmed" && prevStatus !== "confirmed") {
+      if (booking.booking_type === "stay") {
+        await dispatchStayBookingConfirmedEmail(booking, locations.get(booking.item_id) || places.get(booking.item_id), req);
+      }
+    } else if (newStatus === "cancelled" && prevStatus !== "cancelled") {
+      if (booking.booking_type === "stay") {
+        await dispatchStayBookingCancelledEmail(booking, locations.get(booking.item_id) || places.get(booking.item_id), req);
+      }
+    }
+  } catch (err: any) {
+    console.warn(`[Status Update] Non-fatal notification dispatch issue for #${booking.id}:`, err?.message);
+  }
+
   res.json(booking);
 });
 
@@ -2187,7 +2901,7 @@ app.patch("/api/host-applications/:id/status", authMiddleware(), (req: Authentic
 });
 
 // Notifications audit log: Admin or user-filtered
-app.get("/api/notifications", authMiddleware(), (req: AuthenticatedRequest, res) => {
+app.get(["/api/notifications", "/api/email/notifications"], authMiddleware(), (req: AuthenticatedRequest, res) => {
   let result = [...emailNotifications].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
@@ -2196,6 +2910,92 @@ app.get("/api/notifications", authMiddleware(), (req: AuthenticatedRequest, res)
     result = result.filter((n) => n.recipient_email.toLowerCase() === userEmail);
   }
   res.json(result);
+});
+
+// Email Service Status & Diagnostics
+app.get("/api/email/status", (_req, res) => {
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpPort = Number(process.env.SMTP_PORT) || 587;
+  const smtpUser = process.env.SMTP_USER;
+  const hasPass = Boolean(process.env.SMTP_PASSWORD);
+  const senderName = process.env.SENDER_NAME || "Pahadíly";
+  const smtpFrom = process.env.SMTP_FROM || `"${senderName}" <no-reply@pahadily.com>`;
+
+  res.json({
+    configured: Boolean(smtpHost && smtpUser && hasPass),
+    host: smtpHost || null,
+    port: smtpPort,
+    user: smtpUser ? `${smtpUser.slice(0, 3)}***` : null,
+    from: smtpFrom,
+    sender_name: senderName,
+    notifications_logged: emailNotifications.length,
+    last_notification: emailNotifications[emailNotifications.length - 1] || null,
+  });
+});
+
+// Admin Test SMTP Dispatch (Strictly Admin-Only & Sanitized Diagnostics)
+app.post("/api/email/test-smtp", authMiddleware(), async (req: AuthenticatedRequest, res) => {
+  if (req.user?.role !== "admin") {
+    return res.status(403).json({ detail: "Administrator access required to test SMTP service." });
+  }
+
+  const targetEmail = String(req.body.target_email || req.user.email).trim().toLowerCase();
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!targetEmail || !emailRegex.test(targetEmail)) {
+    return res.status(400).json({ detail: "A valid recipient email address is required for SMTP test." });
+  }
+
+  const testBooking: Booking = {
+    id: 9999,
+    booking_type: "stay",
+    item_id: 1,
+    item_title: "Test Himalayan Homestay Reservation",
+    item_image: null,
+    user_id: req.user.id,
+    traveler_name: req.user.full_name || "Pahadíly Traveler",
+    traveler_email: targetEmail,
+    traveler_phone: "+91 98000 00000",
+    travel_date: new Date().toISOString().slice(0, 10),
+    end_date: new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10),
+    time_slot: "overnight",
+    activity_type: "Traditional Kath-Kuni Homestay Immersion",
+    guests: "2",
+    nights: 2,
+    total_price: "₹3,600",
+    payment_method: "pay_on_meetup",
+    payment_status: "pending",
+    payment_id: "PHD-TEST-9999",
+    transaction_ref: "TXN-TEST-SMTP",
+    message: "Automated SMTP integration verification test.",
+    status: "confirmed",
+    provider_id: null,
+    provider_name: "Tirthan River Valley Host",
+    provider_notes: null,
+    suggested_date: null,
+    created_at: new Date().toISOString(),
+  };
+
+  try {
+    const notif = await dispatchStayBookingConfirmedEmail(testBooking, null, req);
+    // Sanitize response: Never expose passwords, internal ports, or raw secrets
+    res.json({
+      status: notif.status,
+      message:
+        notif.status === "accepted"
+          ? `Test confirmation email accepted by SMTP server for delivery to ${targetEmail}.`
+          : notif.status === "unavailable"
+          ? "SMTP credentials are not configured in this environment. Outgoing email skipped."
+          : "SMTP server rejected the email transmission. Check SMTP host settings.",
+      recipient: targetEmail,
+      booking_id: testBooking.id,
+      notification_id: notif.id,
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      status: "failed",
+      detail: "Unexpected error during test SMTP dispatch.",
+    });
+  }
 });
 
 // API Root info
