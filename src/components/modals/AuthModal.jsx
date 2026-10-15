@@ -149,9 +149,9 @@ export default function AuthModal() {
               borderRadius: '8px',
               fontSize: '13px',
               fontWeight: 600,
-              backgroundColor: tab === 'login' ? '#174D39' : 'transparent',
-              color: tab === 'login' ? '#FFFFFF' : '#10251D',
-              transition: 'all 0.2s',
+              backgroundColor: tab === 'login' ? 'var(--color-forest-light, #205540)' : 'transparent',
+              color: tab === 'login' ? '#FFFFFF' : 'var(--color-text-main, #0C2017)',
+              transition: 'all 0.15s ease',
             }}
           >
             Sign In
@@ -168,9 +168,9 @@ export default function AuthModal() {
               borderRadius: '8px',
               fontSize: '13px',
               fontWeight: 600,
-              backgroundColor: tab === 'signup' ? '#174D39' : 'transparent',
-              color: tab === 'signup' ? '#FFFFFF' : '#10251D',
-              transition: 'all 0.2s',
+              backgroundColor: tab === 'signup' ? 'var(--color-forest-light, #205540)' : 'transparent',
+              color: tab === 'signup' ? '#FFFFFF' : 'var(--color-text-main, #0C2017)',
+              transition: 'all 0.15s ease',
             }}
           >
             Create Account
@@ -393,15 +393,21 @@ export default function AuthModal() {
             style={{
               width: '100%',
               padding: '12px',
-              backgroundColor: '#174D39',
+              backgroundColor: 'var(--color-forest-light, #205540)',
               color: '#FFFFFF',
-              borderRadius: '9999px',
-              fontSize: '15px',
+              borderRadius: '10px',
+              fontSize: '14.5px',
               fontWeight: 600,
               border: 'none',
               cursor: loading ? 'not-allowed' : 'pointer',
-              boxShadow: '0 6px 18px rgba(23, 77, 57, 0.25)',
               marginBottom: '20px',
+              transition: 'background-color 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              if (!loading) e.currentTarget.style.backgroundColor = 'var(--color-forest-dark, #0A251B)';
+            }}
+            onMouseLeave={(e) => {
+              if (!loading) e.currentTarget.style.backgroundColor = 'var(--color-forest-light, #205540)';
             }}
           >
             {loading ? 'Please wait...' : tab === 'login' ? 'Sign In to Account' : 'Create My Account'}

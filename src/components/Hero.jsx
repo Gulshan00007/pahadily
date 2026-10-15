@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 const PILOT_VALLEYS = [
   {
@@ -58,9 +58,9 @@ function Hero() {
     <section className="hero-section">
       <div className="hero-media-wrapper">
         <img
-          src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=2000&q=85"
+          src="/images/hero/himachal-hero.jpg"
           onError={(e) => {
-            e.currentTarget.src = '/images/hero/himachal-hero.jpg';
+            e.currentTarget.src = 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=2000&q=85';
           }}
           alt="Ancient deodar pines and snow-capped Himalayan peaks in Himachal Pradesh"
           className="hero-backdrop-img"
@@ -142,9 +142,70 @@ function Hero() {
             </button>
           </form>
 
-
-
-          {/* Quick Valley Discovery Pills */}
+          {/* Master Specification: One primary action + one secondary text-style action */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '16px',
+              marginBottom: '20px',
+              flexWrap: 'wrap',
+            }}
+          >
+            <Link
+              to="/explore"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '9px 18px',
+                backgroundColor: 'var(--color-forest-light, #205540)',
+                color: '#ffffff',
+                borderRadius: '8px',
+                fontWeight: 600,
+                fontSize: '14px',
+                border: '1px solid rgba(255,255,255,0.18)',
+                transition: 'background-color 0.15s ease, border-color 0.15s ease',
+                textDecoration: 'none',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--color-forest-medium, #143d2d)';
+                e.currentTarget.style.borderColor = 'var(--color-sage-accent, #65b88e)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--color-forest-light, #205540)';
+                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.18)';
+              }}
+            >
+              Explore the Himalayas <span aria-hidden="true">→</span>
+            </Link>
+            <Link
+              to="/companions"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 12px',
+                color: 'rgba(255, 255, 255, 0.92)',
+                fontWeight: 500,
+                fontSize: '14px',
+                textDecoration: 'underline',
+                textUnderlineOffset: '4px',
+                textDecorationColor: 'rgba(255, 255, 255, 0.4)',
+                transition: 'color 0.15s ease, text-decoration-color 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = '#ffffff';
+                e.currentTarget.style.textDecorationColor = 'var(--color-sage-light, #9ee0bd)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = 'rgba(255, 255, 255, 0.92)';
+                e.currentTarget.style.textDecorationColor = 'rgba(255, 255, 255, 0.4)';
+              }}
+            >
+              Meet Local People
+            </Link>
+          </div>
           <div
             style={{
               display: 'flex',
@@ -176,7 +237,7 @@ function Hero() {
                   border: '1px solid rgba(255,255,255,0.18)',
                   cursor: 'pointer',
                   fontSize: '12.5px',
-                  transition: 'background 0.2s ease',
+                  transition: 'background 0.15s ease',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = 'rgba(20, 61, 45, 0.7)';

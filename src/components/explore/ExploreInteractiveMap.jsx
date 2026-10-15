@@ -274,7 +274,7 @@ export default function ExploreInteractiveMap({
           style={{
             transform: `scale(${zoomLevel})`,
             transformOrigin: 'center center',
-            transition: 'transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
+            transition: 'transform 0.16s ease',
           }}
         >
           {/* SVG Topographic Artboard */}

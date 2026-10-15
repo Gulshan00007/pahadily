@@ -137,10 +137,11 @@ export default function MyBookingsPage() {
                   borderRadius: '9999px',
                   fontSize: '13px',
                   fontWeight: active ? 700 : 500,
-                  backgroundColor: active ? '#174D39' : 'transparent',
-                  color: active ? '#FFFFFF' : '#10251D',
-                  border: active ? '1px solid #174D39' : '1px solid rgba(16, 37, 29, 0.12)',
+                  backgroundColor: active ? 'var(--color-forest-light, #205540)' : 'transparent',
+                  color: active ? '#FFFFFF' : 'var(--color-text-main, #0C2017)',
+                  border: active ? '1px solid #205540' : '1px solid rgba(10, 37, 27, 0.12)',
                   cursor: 'pointer',
+                  transition: 'all 0.15s ease',
                 }}
               >
                 {tab.label}
@@ -197,13 +198,22 @@ export default function MyBookingsPage() {
               <div
                 key={b.id}
                 style={{
-                  backgroundColor: '#FFFFFF',
-                  borderRadius: '16px',
-                  border: '1px solid rgba(16, 37, 29, 0.1)',
-                  boxShadow: '0 4px 16px rgba(16, 37, 29, 0.04)',
+                  backgroundColor: 'var(--color-bg-surface-elevated, #FFFFFF)',
+                  borderRadius: '14px',
+                  border: '1px solid rgba(10, 37, 27, 0.08)',
+                  boxShadow: '0 2px 8px rgba(10, 37, 27, 0.04)',
                   padding: '24px',
                   display: 'flex',
                   flexDirection: 'column',
+                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = 'rgba(101, 184, 142, 0.45)';
+                  e.currentTarget.style.boxShadow = '0 6px 18px rgba(10, 37, 27, 0.08)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = 'rgba(10, 37, 27, 0.08)';
+                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(10, 37, 27, 0.04)';
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
@@ -217,7 +227,7 @@ export default function MyBookingsPage() {
                   style={{
                     fontFamily: "'Playfair Display', Georgia, serif",
                     fontSize: '20px',
-                    color: '#10251D',
+                    color: 'var(--color-text-main, #0C2017)',
                     margin: '0 0 6px 0',
                     lineHeight: 1.25,
                   }}
@@ -225,18 +235,18 @@ export default function MyBookingsPage() {
                   {b.item_title}
                 </h3>
 
-                <div style={{ fontSize: '13px', color: '#536B5E', marginBottom: '16px' }}>
+                <div style={{ fontSize: '13px', color: 'var(--color-text-muted, #536B5E)', marginBottom: '16px' }}>
                   📍 {b.location}
                 </div>
 
                 {/* Booking details table */}
                 <div
                   style={{
-                    backgroundColor: '#FAF8F2',
+                    backgroundColor: 'var(--color-bg-card, #F3EFE6)',
                     borderRadius: '10px',
                     padding: '12px 14px',
                     fontSize: '12.5px',
-                    color: '#1e362c',
+                    color: 'var(--color-text-body, #1E362C)',
                     display: 'grid',
                     gridTemplateColumns: 'repeat(2, 1fr)',
                     gap: '8px',
@@ -257,7 +267,7 @@ export default function MyBookingsPage() {
                   </div>
                   <div>
                     <span style={{ color: '#536B5E', display: 'block' }}>Total Honorarium:</span>
-                    <strong style={{ color: '#174D39' }}>{b.total_price}</strong>
+                    <strong style={{ color: 'var(--color-forest-light, #205540)' }}>{b.total_price}</strong>
                   </div>
                 </div>
 
@@ -265,11 +275,11 @@ export default function MyBookingsPage() {
                 {b.provider_note && (
                   <div
                     style={{
-                      backgroundColor: 'rgba(23, 77, 57, 0.08)',
+                      backgroundColor: 'rgba(32, 85, 64, 0.08)',
                       borderRadius: '8px',
                       padding: '10px 12px',
                       fontSize: '12px',
-                      color: '#174D39',
+                      color: 'var(--color-forest-light, #205540)',
                       marginBottom: '16px',
                     }}
                   >
@@ -286,14 +296,17 @@ export default function MyBookingsPage() {
                       style={{
                         flex: 1,
                         padding: '9px 12px',
-                        borderRadius: '9999px',
-                        backgroundColor: '#174D39',
+                        borderRadius: '8px',
+                        backgroundColor: 'var(--color-forest-light, #205540)',
                         color: '#FFFFFF',
                         fontSize: '12.5px',
-                        fontWeight: 700,
+                        fontWeight: 600,
                         border: 'none',
                         cursor: 'pointer',
+                        transition: 'background-color 0.15s ease',
                       }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-forest-dark, #0A251B)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-forest-light, #205540)')}
                     >
                       View Mountain Voucher
                     </button>
@@ -304,14 +317,21 @@ export default function MyBookingsPage() {
                       type="button"
                       onClick={() => handleCancelBooking(b.id)}
                       style={{
-                        padding: '9px 14px',
-                        borderRadius: '9999px',
+                        padding: '8px 14px',
+                        borderRadius: '8px',
                         backgroundColor: 'transparent',
-                        color: '#c86d51',
+                        color: 'var(--color-terracotta-warm, #c86d51)',
                         border: '1px solid rgba(200, 109, 81, 0.3)',
                         fontSize: '12px',
                         fontWeight: 600,
                         cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'rgba(200, 109, 81, 0.08)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
                       }}
                     >
                       Cancel Request

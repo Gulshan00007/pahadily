@@ -110,13 +110,22 @@ export default function LocalCompanionsSection() {
             <div
               key={loc.id}
               style={{
-                backgroundColor: '#FAF8F2',
-                borderRadius: '16px',
+                backgroundColor: 'var(--color-bg-surface-elevated, #FFFFFF)',
+                borderRadius: '14px',
                 padding: '24px',
-                border: '1px solid rgba(16, 38, 29, 0.1)',
-                boxShadow: '0 8px 24px rgba(10, 37, 27, 0.04)',
+                border: '1px solid rgba(10, 37, 27, 0.08)',
+                boxShadow: '0 2px 8px rgba(10, 37, 27, 0.04)',
                 display: 'flex',
                 flexDirection: 'column',
+                transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(101, 184, 142, 0.45)';
+                e.currentTarget.style.boxShadow = '0 6px 18px rgba(10, 37, 27, 0.08)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(10, 37, 27, 0.08)';
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(10, 37, 27, 0.04)';
               }}
             >
               {/* Header profile info */}
@@ -227,17 +236,18 @@ export default function LocalCompanionsSection() {
                   type="button"
                   onClick={() => openBooking(loc, 'local')}
                   style={{
-                    padding: '10px 20px',
-                    borderRadius: '9999px',
-                    backgroundColor: '#174D39',
+                    padding: '9px 18px',
+                    borderRadius: '8px',
+                    backgroundColor: 'var(--color-forest-light, #205540)',
                     color: '#FFFFFF',
                     fontSize: '13px',
                     fontWeight: 600,
                     border: 'none',
                     cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(23, 77, 57, 0.25)',
-                    transition: 'all 0.2s',
+                    transition: 'background-color 0.15s ease',
                   }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-forest-dark, #0A251B)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-forest-light, #205540)'; }}
                 >
                   Request Companion →
                 </button>

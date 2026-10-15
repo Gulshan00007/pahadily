@@ -750,15 +750,21 @@ export default function BecomeALocalPage() {
                   disabled={submitting}
                   style={{
                     width: '100%',
-                    padding: '14px',
-                    borderRadius: '9999px',
-                    backgroundColor: submitting ? '#536B5E' : '#174D39',
+                    padding: '13px',
+                    borderRadius: '10px',
+                    backgroundColor: submitting ? 'var(--color-text-muted, #536B5E)' : 'var(--color-forest-light, #205540)',
                     color: '#FFFFFF',
-                    fontSize: '15px',
-                    fontWeight: 700,
+                    fontSize: '14.5px',
+                    fontWeight: 600,
                     border: 'none',
                     cursor: submitting ? 'wait' : 'pointer',
-                    boxShadow: '0 4px 14px rgba(23, 77, 57, 0.25)',
+                    transition: 'background-color 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!submitting) e.currentTarget.style.backgroundColor = 'var(--color-forest-dark, #0A251B)';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!submitting) e.currentTarget.style.backgroundColor = 'var(--color-forest-light, #205540)';
                   }}
                 >
                   {submitting ? 'Submitting to Local Coordinator...' : 'Submit Application for Review →'}

@@ -68,7 +68,7 @@ const CATEGORIES = [
 
 export default function ExploreByCategorySection() {
   return (
-    <section style={{ padding: '72px 0', backgroundColor: '#F7F5EE' }}>
+    <section style={{ padding: '72px 0', backgroundColor: 'var(--color-bg-ivory, #FAF8F2)' }}>
       <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 24px' }}>
         {/* Section Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '16px', marginBottom: '36px' }}>
@@ -78,7 +78,7 @@ export default function ExploreByCategorySection() {
                 fontSize: '12px',
                 textTransform: 'uppercase',
                 letterSpacing: '0.14em',
-                color: '#174D39',
+                color: 'var(--color-forest-medium, #143D2D)',
                 fontWeight: 700,
                 display: 'block',
                 marginBottom: '6px',
@@ -90,7 +90,7 @@ export default function ExploreByCategorySection() {
               style={{
                 fontFamily: "'Playfair Display', Georgia, serif",
                 fontSize: '32px',
-                color: '#10251D',
+                color: 'var(--color-text-main, #0C2017)',
                 margin: 0,
                 letterSpacing: '-0.01em',
               }}
@@ -103,7 +103,7 @@ export default function ExploreByCategorySection() {
             style={{
               fontSize: '14px',
               fontWeight: 600,
-              color: '#174D39',
+              color: 'var(--color-forest-medium, #143D2D)',
               textDecoration: 'none',
               display: 'inline-flex',
               alignItems: 'center',
@@ -130,22 +130,22 @@ export default function ExploreByCategorySection() {
               style={{
                 display: 'flex',
                 flexDirection: 'column',
-                borderRadius: '16px',
+                borderRadius: '14px',
                 overflow: 'hidden',
-                backgroundColor: '#FFFFFF',
-                border: '1px solid rgba(16, 37, 29, 0.08)',
-                boxShadow: '0 4px 16px rgba(16, 37, 29, 0.04)',
+                backgroundColor: 'var(--color-bg-surface-elevated, #FFFFFF)',
+                border: '1px solid rgba(10, 37, 27, 0.08)',
+                boxShadow: '0 2px 8px rgba(10, 37, 27, 0.04)',
                 textDecoration: 'none',
                 color: 'inherit',
-                transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-4px)';
-                e.currentTarget.style.boxShadow = '0 12px 28px rgba(16, 37, 29, 0.1)';
+                e.currentTarget.style.borderColor = 'rgba(101, 184, 142, 0.45)';
+                e.currentTarget.style.boxShadow = '0 6px 18px rgba(10, 37, 27, 0.08)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 16px rgba(16, 37, 29, 0.04)';
+                e.currentTarget.style.borderColor = 'rgba(10, 37, 27, 0.08)';
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(10, 37, 27, 0.04)';
               }}
             >
               <div style={{ position: 'relative', height: '160px', overflow: 'hidden' }}>

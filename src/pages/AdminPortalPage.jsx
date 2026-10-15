@@ -127,10 +127,11 @@ export default function AdminPortalPage() {
                   borderRadius: '9999px',
                   fontSize: '13px',
                   fontWeight: active ? 700 : 500,
-                  backgroundColor: active ? '#174D39' : 'transparent',
-                  color: active ? '#FFFFFF' : '#10251D',
-                  border: active ? '1px solid #174D39' : '1px solid rgba(16, 37, 29, 0.12)',
+                  backgroundColor: active ? 'var(--color-forest-light, #205540)' : 'transparent',
+                  color: active ? '#FFFFFF' : 'var(--color-text-main, #0C2017)',
+                  border: active ? '1px solid #205540' : '1px solid rgba(10, 37, 27, 0.12)',
                   cursor: 'pointer',
+                  transition: 'all 0.15s ease',
                 }}
               >
                 {tab.label}
@@ -165,12 +166,22 @@ export default function AdminPortalPage() {
                       <div
                         key={app.id}
                         style={{
-                          backgroundColor: '#FFFFFF',
-                          borderRadius: '16px',
-                          border: '1px solid rgba(16, 37, 29, 0.1)',
+                          backgroundColor: 'var(--color-bg-surface-elevated, #FFFFFF)',
+                          borderRadius: '14px',
+                          border: '1px solid rgba(10, 37, 27, 0.08)',
+                          boxShadow: '0 2px 8px rgba(10, 37, 27, 0.04)',
                           padding: '24px',
                           display: 'flex',
                           flexDirection: 'column',
+                          transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = 'rgba(101, 184, 142, 0.45)';
+                          e.currentTarget.style.boxShadow = '0 6px 18px rgba(10, 37, 27, 0.08)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = 'rgba(10, 37, 27, 0.08)';
+                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(10, 37, 27, 0.04)';
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
@@ -185,37 +196,37 @@ export default function AdminPortalPage() {
                               borderRadius: '9999px',
                               backgroundColor:
                                 app.status === 'approved'
-                                  ? 'rgba(23, 77, 57, 0.15)'
+                                  ? 'rgba(32, 85, 64, 0.15)'
                                   : app.status === 'rejected'
                                   ? 'rgba(200, 109, 81, 0.15)'
                                   : 'rgba(217, 154, 56, 0.2)',
                               color:
                                 app.status === 'approved'
-                                  ? '#174D39'
+                                  ? 'var(--color-forest-light, #205540)'
                                   : app.status === 'rejected'
-                                  ? '#a3391b'
-                                  : '#99630c',
+                                  ? 'var(--color-terracotta-warm, #c86d51)'
+                                  : 'var(--color-gold-warm, #d99a38)',
                             }}
                           >
                             {app.status?.toUpperCase()}
                           </span>
                         </div>
 
-                        <h4 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: '20px', color: '#10251D', margin: '0 0 4px 0' }}>
+                        <h4 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: '20px', color: 'var(--color-text-main, #0C2017)', margin: '0 0 4px 0' }}>
                           {app.name}
                         </h4>
-                        <div style={{ fontSize: '13px', color: '#174D39', fontWeight: 600, marginBottom: '12px' }}>
+                        <div style={{ fontSize: '13px', color: 'var(--color-forest-light, #205540)', fontWeight: 600, marginBottom: '12px' }}>
                           {app.skill} • {app.price} {app.unit}
                         </div>
 
-                        <div style={{ backgroundColor: '#FAF8F2', borderRadius: '10px', padding: '12px', fontSize: '12.5px', lineHeight: 1.6, color: '#1e362c', marginBottom: '14px' }}>
+                        <div style={{ backgroundColor: 'var(--color-bg-card, #F3EFE6)', borderRadius: '10px', padding: '12px', fontSize: '12.5px', lineHeight: 1.6, color: 'var(--color-text-body, #1E362C)', marginBottom: '14px' }}>
                           <div><strong>Phone:</strong> {app.phone}</div>
                           <div><strong>Email:</strong> {app.email}</div>
                           <div><strong>Languages:</strong> {app.languages}</div>
                           {app.property_name && <div><strong>Property:</strong> {app.property_name}</div>}
                         </div>
 
-                        <p style={{ fontSize: '13px', color: '#536B5E', lineHeight: 1.5, margin: '0 0 20px 0', flex: 1 }}>
+                        <p style={{ fontSize: '13px', color: 'var(--color-text-muted, #536B5E)', lineHeight: 1.5, margin: '0 0 20px 0', flex: 1 }}>
                           "{app.bio}"
                         </p>
 
@@ -227,15 +238,18 @@ export default function AdminPortalPage() {
                               onClick={() => handleApprove(app.id)}
                               style={{
                                 flex: 1,
-                                padding: '10px',
-                                borderRadius: '9999px',
-                                backgroundColor: '#174D39',
+                                padding: '9px 14px',
+                                borderRadius: '8px',
+                                backgroundColor: 'var(--color-forest-light, #205540)',
                                 color: '#FFFFFF',
                                 fontSize: '13px',
-                                fontWeight: 700,
+                                fontWeight: 600,
                                 border: 'none',
                                 cursor: 'pointer',
+                                transition: 'background-color 0.15s ease',
                               }}
+                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-forest-dark, #0A251B)')}
+                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-forest-light, #205540)')}
                             >
                               {processingId === app.id ? 'Processing...' : 'Approve & Publish'}
                             </button>
@@ -244,14 +258,21 @@ export default function AdminPortalPage() {
                               disabled={processingId === app.id}
                               onClick={() => handleReject(app.id)}
                               style={{
-                                padding: '10px 16px',
-                                borderRadius: '9999px',
+                                padding: '9px 14px',
+                                borderRadius: '8px',
                                 backgroundColor: 'transparent',
-                                color: '#c86d51',
+                                color: 'var(--color-terracotta-warm, #c86d51)',
                                 border: '1px solid rgba(200, 109, 81, 0.3)',
                                 fontSize: '13px',
                                 fontWeight: 600,
                                 cursor: 'pointer',
+                                transition: 'all 0.15s ease',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = 'rgba(200, 109, 81, 0.08)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = 'transparent';
                               }}
                             >
                               Decline

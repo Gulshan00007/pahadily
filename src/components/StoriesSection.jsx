@@ -73,22 +73,22 @@ export default function StoriesSection() {
             <article
               key={story.id}
               style={{
-                backgroundColor: '#FFFFFF',
-                borderRadius: '16px',
+                backgroundColor: 'var(--color-bg-surface-elevated, #FFFFFF)',
+                borderRadius: '14px',
                 overflow: 'hidden',
-                border: '1px solid rgba(16, 37, 29, 0.08)',
-                boxShadow: '0 4px 20px rgba(16, 37, 29, 0.04)',
+                border: '1px solid rgba(10, 37, 27, 0.08)',
+                boxShadow: '0 2px 8px rgba(10, 37, 27, 0.04)',
                 display: 'flex',
                 flexDirection: 'column',
-                transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-4px)';
-                e.currentTarget.style.boxShadow = '0 12px 30px rgba(16, 37, 29, 0.1)';
+                e.currentTarget.style.borderColor = 'rgba(101, 184, 142, 0.45)';
+                e.currentTarget.style.boxShadow = '0 6px 18px rgba(10, 37, 27, 0.08)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 20px rgba(16, 37, 29, 0.04)';
+                e.currentTarget.style.borderColor = 'rgba(10, 37, 27, 0.08)';
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(10, 37, 27, 0.04)';
               }}
             >
               {/* Image banner */}

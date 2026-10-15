@@ -135,11 +135,11 @@ export default function ExperiencesSection() {
                   borderRadius: '9999px',
                   fontSize: '13px',
                   fontWeight: 600,
-                  backgroundColor: categoryFilter === cat.id ? '#174D39' : '#EDE8DC',
-                  color: categoryFilter === cat.id ? '#FFFFFF' : '#10251D',
-                  border: 'none',
+                  backgroundColor: categoryFilter === cat.id ? 'var(--color-forest-light, #205540)' : 'var(--color-bg-card, #F3EFE6)',
+                  color: categoryFilter === cat.id ? '#FFFFFF' : 'var(--color-text-main, #0C2017)',
+                  border: categoryFilter === cat.id ? '1px solid #205540' : '1px solid rgba(10, 37, 27, 0.12)',
                   cursor: 'pointer',
-                  transition: 'all 0.2s',
+                  transition: 'all 0.15s ease',
                 }}
               >
                 {cat.label}
@@ -160,13 +160,22 @@ export default function ExperiencesSection() {
             <div
               key={exp.id}
               style={{
-                backgroundColor: '#FFFFFF',
-                borderRadius: '16px',
+                backgroundColor: 'var(--color-bg-surface-elevated, #FFFFFF)',
+                borderRadius: '14px',
                 overflow: 'hidden',
-                border: '1px solid rgba(16, 38, 29, 0.1)',
-                boxShadow: '0 8px 24px rgba(10, 37, 27, 0.04)',
+                border: '1px solid rgba(10, 37, 27, 0.08)',
+                boxShadow: '0 2px 8px rgba(10, 37, 27, 0.04)',
                 display: 'flex',
                 flexDirection: 'column',
+                transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(101, 184, 142, 0.45)';
+                e.currentTarget.style.boxShadow = '0 6px 18px rgba(10, 37, 27, 0.08)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(10, 37, 27, 0.08)';
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(10, 37, 27, 0.04)';
               }}
             >
               <div style={{ position: 'relative', height: '200px', overflow: 'hidden' }}>
@@ -262,16 +271,18 @@ export default function ExperiencesSection() {
                     type="button"
                     onClick={() => openBooking(exp, 'experience')}
                     style={{
-                      padding: '8px 18px',
-                      borderRadius: '9999px',
-                      backgroundColor: '#174D39',
+                      padding: '9px 18px',
+                      borderRadius: '8px',
+                      backgroundColor: 'var(--color-forest-light, #205540)',
                       color: '#FFFFFF',
                       fontSize: '13px',
                       fontWeight: 600,
                       border: 'none',
                       cursor: 'pointer',
-                      boxShadow: '0 4px 12px rgba(23, 77, 57, 0.2)',
+                      transition: 'background-color 0.15s ease',
                     }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-forest-dark, #0A251B)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-forest-light, #205540)'; }}
                   >
                     Request Experience →
                   </button>

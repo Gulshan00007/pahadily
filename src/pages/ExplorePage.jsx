@@ -822,22 +822,22 @@ export default function ExplorePage() {
       <article
         key={dest.id}
         style={{
-          backgroundColor: '#FFFFFF',
-          borderRadius: '16px',
+          backgroundColor: 'var(--color-bg-surface-elevated, #FFFFFF)',
+          borderRadius: '14px',
           overflow: 'hidden',
-          border: '1px solid rgba(16, 37, 29, 0.08)',
-          boxShadow: '0 4px 20px rgba(16, 37, 29, 0.04)',
+          border: '1px solid rgba(10, 37, 27, 0.08)',
+          boxShadow: '0 2px 8px rgba(10, 37, 27, 0.04)',
           display: 'flex',
           flexDirection: 'column',
-          transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+          transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'translateY(-4px)';
-          e.currentTarget.style.boxShadow = '0 12px 28px rgba(16, 37, 29, 0.1)';
+          e.currentTarget.style.borderColor = 'rgba(101, 184, 142, 0.45)';
+          e.currentTarget.style.boxShadow = '0 6px 18px rgba(10, 37, 27, 0.08)';
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'translateY(0)';
-          e.currentTarget.style.boxShadow = '0 4px 20px rgba(16, 37, 29, 0.04)';
+          e.currentTarget.style.borderColor = 'rgba(10, 37, 27, 0.08)';
+          e.currentTarget.style.boxShadow = '0 2px 8px rgba(10, 37, 27, 0.04)';
         }}
       >
         {/* Image wrap */}
@@ -853,9 +853,9 @@ export default function ExplorePage() {
               position: 'absolute',
               top: '12px',
               left: '12px',
-              backgroundColor: 'rgba(16, 37, 29, 0.8)',
+              backgroundColor: 'rgba(10, 37, 27, 0.85)',
               backdropFilter: 'blur(4px)',
-              color: '#8EE49A',
+              color: 'var(--color-sage-light, #9ee0bd)',
               fontSize: '11px',
               fontWeight: 700,
               padding: '3px 10px',
@@ -869,12 +869,13 @@ export default function ExplorePage() {
               position: 'absolute',
               bottom: '12px',
               right: '12px',
-              backgroundColor: 'rgba(247, 245, 238, 0.92)',
-              color: '#10251D',
+              backgroundColor: 'rgba(250, 248, 242, 0.95)',
+              color: 'var(--color-text-main, #0C2017)',
               fontSize: '11px',
               fontWeight: 700,
               padding: '3px 9px',
               borderRadius: '9999px',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
             }}
           >
             From {minPrice}/night
@@ -883,7 +884,7 @@ export default function ExplorePage() {
 
         {/* Card Body */}
         <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ fontSize: '11.5px', color: '#174D39', fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px' }}>
+          <div style={{ fontSize: '11.5px', color: 'var(--color-forest-light, #205540)', fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.06em' }}>
             {dest.subValley || dest.region}
           </div>
 
@@ -891,7 +892,7 @@ export default function ExplorePage() {
             style={{
               fontFamily: "'Playfair Display', Georgia, serif",
               fontSize: '20px',
-              color: '#10251D',
+              color: 'var(--color-text-main, #0C2017)',
               margin: '0 0 8px 0',
               lineHeight: 1.25,
             }}
@@ -903,7 +904,7 @@ export default function ExplorePage() {
             style={{
               fontSize: '13px',
               lineHeight: 1.5,
-              color: '#536B5E',
+              color: 'var(--color-text-muted, #536B5E)',
               margin: '0 0 16px 0',
               flex: 1,
             }}
@@ -918,8 +919,8 @@ export default function ExplorePage() {
                 key={a.id}
                 style={{
                   fontSize: '11px',
-                  backgroundColor: '#F3EFE6',
-                  color: '#174D39',
+                  backgroundColor: 'var(--color-bg-card, #F3EFE6)',
+                  color: 'var(--color-forest-light, #205540)',
                   padding: '2px 8px',
                   borderRadius: '4px',
                   fontWeight: 600,
@@ -938,14 +939,17 @@ export default function ExplorePage() {
               style={{
                 flex: 1,
                 padding: '9px 12px',
-                borderRadius: '9999px',
-                backgroundColor: '#FAF8F2',
-                border: '1px solid rgba(16, 37, 29, 0.16)',
-                color: '#10251D',
+                borderRadius: '8px',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid rgba(10, 37, 27, 0.14)',
+                color: 'var(--color-text-main, #0C2017)',
                 fontSize: '12.5px',
                 fontWeight: 600,
                 cursor: 'pointer',
+                transition: 'background-color 0.15s ease',
               }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3EFE6'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#FFFFFF'; }}
             >
               View Sights & Map
             </button>
@@ -967,14 +971,17 @@ export default function ExplorePage() {
               style={{
                 flex: 1,
                 padding: '9px 12px',
-                borderRadius: '9999px',
-                backgroundColor: '#174D39',
+                borderRadius: '8px',
+                backgroundColor: 'var(--color-forest-light, #205540)',
                 color: '#FFFFFF',
                 fontSize: '12.5px',
                 fontWeight: 600,
                 border: 'none',
                 cursor: 'pointer',
+                transition: 'background-color 0.15s ease',
               }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-forest-dark, #0A251B)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-forest-light, #205540)'; }}
             >
               Request Guide
             </button>

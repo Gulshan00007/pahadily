@@ -131,10 +131,11 @@ export default function ProviderPortalPage() {
                   borderRadius: '9999px',
                   fontSize: '13px',
                   fontWeight: active ? 700 : 500,
-                  backgroundColor: active ? '#174D39' : 'transparent',
-                  color: active ? '#FFFFFF' : '#10251D',
-                  border: active ? '1px solid #174D39' : '1px solid rgba(16, 37, 29, 0.12)',
+                  backgroundColor: active ? 'var(--color-forest-light, #205540)' : 'transparent',
+                  color: active ? '#FFFFFF' : 'var(--color-text-main, #0C2017)',
+                  border: active ? '1px solid #205540' : '1px solid rgba(10, 37, 27, 0.12)',
                   cursor: 'pointer',
+                  transition: 'all 0.15s ease',
                 }}
               >
                 {tab.label}
@@ -176,13 +177,22 @@ export default function ProviderPortalPage() {
               <div
                 key={req.id}
                 style={{
-                  backgroundColor: '#FFFFFF',
-                  borderRadius: '16px',
-                  border: '1px solid rgba(16, 37, 29, 0.1)',
-                  boxShadow: '0 4px 16px rgba(16, 37, 29, 0.04)',
+                  backgroundColor: 'var(--color-bg-surface-elevated, #FFFFFF)',
+                  borderRadius: '14px',
+                  border: '1px solid rgba(10, 37, 27, 0.08)',
+                  boxShadow: '0 2px 8px rgba(10, 37, 27, 0.04)',
                   padding: '24px',
                   display: 'flex',
                   flexDirection: 'column',
+                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = 'rgba(101, 184, 142, 0.45)';
+                  e.currentTarget.style.boxShadow = '0 6px 18px rgba(10, 37, 27, 0.08)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = 'rgba(10, 37, 27, 0.08)';
+                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(10, 37, 27, 0.04)';
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
@@ -197,16 +207,16 @@ export default function ProviderPortalPage() {
                       borderRadius: '9999px',
                       backgroundColor:
                         req.status === 'confirmed'
-                          ? 'rgba(23, 77, 57, 0.15)'
+                          ? 'rgba(32, 85, 64, 0.15)'
                           : req.status === 'declined'
                           ? 'rgba(200, 109, 81, 0.15)'
                           : 'rgba(217, 154, 56, 0.2)',
                       color:
                         req.status === 'confirmed'
-                          ? '#174D39'
+                          ? 'var(--color-forest-light, #205540)'
                           : req.status === 'declined'
-                          ? '#a3391b'
-                          : '#99630c',
+                          ? 'var(--color-terracotta-warm, #c86d51)'
+                          : 'var(--color-gold-warm, #d99a38)',
                     }}
                   >
                     {req.status === 'confirmed' ? '✓ Confirmed' : req.status === 'declined' ? '✕ Declined' : '⏳ Pending'}

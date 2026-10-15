@@ -119,11 +119,11 @@ export default function PilotValleysSection() {
                   borderRadius: '9999px',
                   fontSize: '13px',
                   fontWeight: 600,
-                  backgroundColor: selectedTag === tag ? '#174D39' : '#EDE8DC',
-                  color: selectedTag === tag ? '#FFFFFF' : '#10251D',
-                  border: 'none',
+                  backgroundColor: selectedTag === tag ? 'var(--color-forest-light, #205540)' : 'var(--color-bg-card, #F3EFE6)',
+                  color: selectedTag === tag ? '#FFFFFF' : 'var(--color-text-main, #0C2017)',
+                  border: selectedTag === tag ? '1px solid #205540' : '1px solid rgba(10, 37, 27, 0.12)',
                   cursor: 'pointer',
-                  transition: 'all 0.2s',
+                  transition: 'all 0.15s ease',
                 }}
               >
                 {tag}
@@ -144,14 +144,22 @@ export default function PilotValleysSection() {
             <div
               key={valley.id}
               style={{
-                backgroundColor: '#FFFFFF',
-                borderRadius: '16px',
+                backgroundColor: 'var(--color-bg-surface-elevated, #FFFFFF)',
+                borderRadius: '14px',
                 overflow: 'hidden',
-                border: '1px solid rgba(16, 38, 29, 0.1)',
-                boxShadow: '0 8px 24px rgba(10, 37, 27, 0.05)',
+                border: '1px solid rgba(10, 37, 27, 0.08)',
+                boxShadow: '0 2px 8px rgba(10, 37, 27, 0.04)',
                 display: 'flex',
                 flexDirection: 'column',
-                transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(101, 184, 142, 0.45)';
+                e.currentTarget.style.boxShadow = '0 6px 18px rgba(10, 37, 27, 0.08)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(10, 37, 27, 0.08)';
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(10, 37, 27, 0.04)';
               }}
             >
               {/* Image Banner */}
@@ -251,15 +259,18 @@ export default function PilotValleysSection() {
                     onClick={() => openDestinationDetail(valley)}
                     style={{
                       flex: 1,
-                      padding: '10px 14px',
-                      borderRadius: '9999px',
-                      backgroundColor: '#FAF8F2',
-                      border: '1px solid rgba(16, 38, 29, 0.18)',
-                      color: '#10251D',
+                      padding: '9px 14px',
+                      borderRadius: '8px',
+                      backgroundColor: '#FFFFFF',
+                      border: '1px solid rgba(10, 37, 27, 0.14)',
+                      color: 'var(--color-text-main, #0C2017)',
                       fontSize: '13px',
                       fontWeight: 600,
                       cursor: 'pointer',
+                      transition: 'background-color 0.15s ease',
                     }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3EFE6'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#FFFFFF'; }}
                   >
                     Valley Details
                   </button>
@@ -280,16 +291,18 @@ export default function PilotValleysSection() {
                     }
                     style={{
                       flex: 1,
-                      padding: '10px 14px',
-                      borderRadius: '9999px',
-                      backgroundColor: '#174D39',
+                      padding: '9px 14px',
+                      borderRadius: '8px',
+                      backgroundColor: 'var(--color-forest-light, #205540)',
                       color: '#FFFFFF',
                       fontSize: '13px',
                       fontWeight: 600,
                       border: 'none',
                       cursor: 'pointer',
-                      boxShadow: '0 4px 12px rgba(23, 77, 57, 0.2)',
+                      transition: 'background-color 0.15s ease',
                     }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-forest-dark, #0A251B)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-forest-light, #205540)'; }}
                   >
                     Request Guide
                   </button>

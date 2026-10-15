@@ -24,7 +24,7 @@ export default function Toast() {
         display: 'flex',
         alignItems: 'center',
         gap: '12px',
-        animation: 'slideUp 0.3s ease-out',
+        animation: 'slideUp 0.16s ease-out',
         fontFamily: "'Plus Jakarta Sans', sans-serif",
         fontSize: '14px',
         lineHeight: '1.4',

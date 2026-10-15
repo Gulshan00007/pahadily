@@ -122,277 +122,548 @@ export default function BookingModal() {
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 2000,
-        backgroundColor: 'rgba(10, 37, 27, 0.75)',
-        backdropFilter: 'blur(8px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '16px',
-      }}
+      className="booking-modal-overlay"
       onClick={closeModal}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="booking-modal-title"
     >
       <div
-        style={{
-          backgroundColor: '#FAF8F2',
-          borderRadius: '20px',
-          width: '100%',
-          maxWidth: '560px',
-          maxHeight: '90vh',
-          overflowY: 'auto',
-          boxShadow: '0 24px 64px rgba(6, 25, 18, 0.4)',
-          border: '1px solid rgba(16, 38, 29, 0.12)',
-          position: 'relative',
-          padding: '32px',
-        }}
+        className="booking-modal-card"
         onClick={(e) => e.stopPropagation()}
       >
-        <button
-          onClick={closeModal}
-          style={{
-            position: 'absolute',
-            top: '20px',
-            right: '20px',
-            fontSize: '20px',
-            color: '#536B5E',
-            cursor: 'pointer',
-            padding: '6px',
-            lineHeight: 1,
-          }}
-          aria-label="Close"
-        >
-          ✕
-        </button>
+        {/* Dedicated Header: Non-overlapping close button & compact progress indicator */}
+        <div className="booking-modal-header">
+          <div className="booking-modal-header-top">
+            <div className="booking-modal-step-title-wrap">
+              <span className="booking-modal-workflow-label">
+                Pahadíly Booking • Step {step} of 6
+              </span>
+              <span className="booking-modal-step-name">
+                {step === 1 && 'Context & Provider'}
+                {step === 2 && 'Select Date'}
+                {step === 3 && 'Choose Time Slot'}
+                {step === 4 && 'Traveler Details'}
+                {step === 5 && 'Price & Review'}
+                {step === 6 && 'Voucher Issued'}
+              </span>
+            </div>
 
-        {/* Step indicator */}
-        <div style={{ marginBottom: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 700, color: '#174D39', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-              Pahadíly Request Workflow • Step {step} of 6
-            </span>
-            <span style={{ fontSize: '12px', color: '#536B5E' }}>
-              {step === 1 && 'Context & Provider'}
-              {step === 2 && 'Select Date'}
-              {step === 3 && 'Choose Time Slot'}
-              {step === 4 && 'Traveler Details'}
-              {step === 5 && 'Price & Review'}
-              {step === 6 && 'Voucher Issued'}
-            </span>
+            <button
+              onClick={closeModal}
+              className="booking-modal-close-btn"
+              aria-label="Close booking modal"
+              type="button"
+            >
+              ✕
+            </button>
           </div>
+
           {/* Progress bar */}
-          <div style={{ height: '4px', backgroundColor: '#E0DACD', borderRadius: '4px', overflow: 'hidden' }}>
+          <div className="booking-modal-progress-track">
             <div
-              style={{
-                height: '100%',
-                width: `${(step / 6) * 100}%`,
-                backgroundColor: '#174D39',
-                transition: 'width 0.3s ease',
-              }}
+              className="booking-modal-progress-bar"
+              style={{ width: `${(step / 6) * 100}%` }}
             />
           </div>
         </div>
 
-        {error && (
-          <div
-            style={{
-              backgroundColor: 'rgba(200, 109, 81, 0.12)',
-              border: '1px solid #c86d51',
-              color: '#a3391b',
-              padding: '10px 14px',
-              borderRadius: '8px',
-              fontSize: '13px',
-              marginBottom: '16px',
-            }}
-          >
-            {error}
-          </div>
-        )}
-
-        {/* STEP 1: CONTEXT */}
-        {step === 1 && (
-          <div>
-            <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: '24px', color: '#10251D', margin: '0 0 10px 0' }}>
-              Request Local Companion / Experience
-            </h3>
-            <p style={{ color: '#536B5E', fontSize: '14px', lineHeight: 1.5, marginBottom: '20px' }}>
-              Pahadíly connects you directly with native Himalayan locals. No intermediaries. Your request will be personally reviewed by the provider.
-            </p>
-
+        {/* Scrollable Modal Body */}
+        <div className="booking-modal-body">
+          {error && (
             <div
               style={{
-                backgroundColor: '#F3EFE6',
-                borderRadius: '14px',
-                padding: '18px',
-                border: '1px solid rgba(16, 38, 29, 0.08)',
-                marginBottom: '24px',
-                display: 'flex',
-                gap: '16px',
-                alignItems: 'center',
+                backgroundColor: 'rgba(200, 109, 81, 0.12)',
+                border: '1px solid #c86d51',
+                color: '#a3391b',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                fontSize: '13px',
+                marginBottom: '16px',
+                lineHeight: 1.45,
               }}
+              role="alert"
             >
+              {error}
+            </div>
+          )}
+
+          {/* STEP 1: CONTEXT & PROVIDER */}
+          {step === 1 && (
+            <div>
+              <h3 id="booking-modal-title" className="booking-step-heading">
+                Request Local Companion / Experience
+              </h3>
+              <p className="booking-step-desc">
+                Pahadíly connects you directly with native Himalayan locals. No intermediaries. Your request will be personally reviewed by the provider.
+              </p>
+
+              <div
+                style={{
+                  backgroundColor: 'var(--color-bg-card, #F3EFE6)',
+                  borderRadius: '14px',
+                  padding: '16px',
+                  border: '1px solid rgba(16, 38, 29, 0.08)',
+                  marginBottom: '20px',
+                  display: 'flex',
+                  gap: '14px',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <div
+                  style={{
+                    width: '60px',
+                    height: '60px',
+                    borderRadius: '12px',
+                    backgroundColor: 'var(--color-forest-medium, #143D2D)',
+                    color: '#FFFFFF',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '26px',
+                    flexShrink: 0,
+                    overflow: 'hidden',
+                  }}
+                >
+                  {targetItem.image ? (
+                    <img
+                      src={targetItem.image}
+                      alt={targetItem.name || targetItem.title}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    '🌲'
+                  )}
+                </div>
+                <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                    <h4 style={{ margin: 0, fontSize: '17px', color: 'var(--color-text-main, #0C2017)', fontWeight: 700, wordBreak: 'break-word' }}>
+                      {targetItem.name || targetItem.title || 'Local Companion'}
+                    </h4>
+                    <span
+                      style={{
+                        fontSize: '11px',
+                        padding: '2px 8px',
+                        borderRadius: '9999px',
+                        backgroundColor: 'rgba(32, 85, 64, 0.12)',
+                        color: 'var(--color-forest-light, #205540)',
+                        fontWeight: 600,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      ✓ Verified Local
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '13px', color: 'var(--color-text-muted, #536B5E)', marginBottom: '4px', wordBreak: 'break-word' }}>
+                    📍 {targetItem.location || 'Kullu District, Himachal Pradesh'} • {targetItem.role || targetItem.duration || 'Himalayan Guide'}
+                  </div>
+                  <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-forest-light, #205540)' }}>
+                    {rawPriceStr}{' '}
+                    <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-text-muted, #536B5E)' }}>
+                      {targetItem.unit || '/day'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 2: CHOOSE DATE */}
+          {step === 2 && (
+            <div>
+              <h3 id="booking-modal-title" className="booking-step-heading">
+                Step 2: When are you visiting?
+              </h3>
+              <p className="booking-step-desc">
+                Select your travel date. We automatically verify provider availability to prevent double-booking.
+              </p>
+
+              <div style={{ marginBottom: '18px' }}>
+                <label htmlFor="booking-travel-date" className="booking-form-label">
+                  Trip Date *
+                </label>
+                <input
+                  id="booking-travel-date"
+                  type="date"
+                  min={new Date().toISOString().slice(0, 10)}
+                  value={travelDate}
+                  onChange={(e) => setTravelDate(e.target.value)}
+                  className="booking-form-control"
+                  required
+                />
+              </div>
+
+              {isDateConflicting ? (
+                <div
+                  style={{
+                    backgroundColor: 'rgba(200, 109, 81, 0.12)',
+                    border: '1px solid #c86d51',
+                    color: '#a3391b',
+                    padding: '12px 14px',
+                    borderRadius: '10px',
+                    fontSize: '13px',
+                    marginBottom: '16px',
+                    lineHeight: 1.45,
+                  }}
+                  role="alert"
+                >
+                  ⚠️ <strong>Slot Conflict:</strong> This provider is already engaged on {travelDate}. Please choose a different date.
+                </div>
+              ) : (
+                <div
+                  style={{
+                    backgroundColor: 'rgba(32, 85, 64, 0.08)',
+                    border: '1px solid rgba(32, 85, 64, 0.25)',
+                    color: 'var(--color-forest-light, #205540)',
+                    padding: '12px 14px',
+                    borderRadius: '10px',
+                    fontSize: '13px',
+                    marginBottom: '16px',
+                    lineHeight: 1.45,
+                  }}
+                >
+                  ✅ <strong>Available:</strong> The provider currently has an open slot on {travelDate}.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* STEP 3: TIME SLOT */}
+          {step === 3 && (
+            <div>
+              <h3 id="booking-modal-title" className="booking-step-heading">
+                Step 3: Select Time Window
+              </h3>
+              <p className="booking-step-desc">
+                Choose whether you want morning exploration, afternoon heritage walks, or a full day companionship.
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
+                {[
+                  {
+                    id: 'morning',
+                    title: 'Morning Exploration',
+                    desc: '09:00 AM – 01:00 PM • Best for crisp mountain air and clear valley views',
+                  },
+                  {
+                    id: 'afternoon',
+                    title: 'Afternoon & Golden Hour',
+                    desc: '02:00 PM – 06:00 PM • Best for village strolls, chai, and sunset ridges',
+                  },
+                  {
+                    id: 'full_day',
+                    title: 'Full Day Immersion',
+                    desc: '09:30 AM – 05:30 PM • Complete day accompanied with local hidden spots',
+                  },
+                ].map((slot) => {
+                  const isSelected = timeSlot === slot.id;
+                  return (
+                    <label
+                      key={slot.id}
+                      className={`booking-timeslot-row ${isSelected ? 'is-selected' : ''}`}
+                    >
+                      <input
+                        type="radio"
+                        name="timeSlot"
+                        value={slot.id}
+                        checked={isSelected}
+                        onChange={() => setTimeSlot(slot.id)}
+                        className="booking-timeslot-radio"
+                      />
+                      <div className="booking-timeslot-info">
+                        <div className="booking-timeslot-title">{slot.title}</div>
+                        <div className="booking-timeslot-desc">{slot.desc}</div>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* STEP 4: TRAVELER DETAILS & INTERESTS */}
+          {step === 4 && (
+            <div>
+              <h3 id="booking-modal-title" className="booking-step-heading">
+                Step 4: Who is visiting?
+              </h3>
+              <p className="booking-step-desc">
+                Help your local provider prepare for your pace, interests, and party size.
+              </p>
+
+              <div className="booking-form-grid-2col">
+                <div>
+                  <label htmlFor="booking-guests" className="booking-form-label">
+                    Number of Travelers
+                  </label>
+                  <select
+                    id="booking-guests"
+                    value={guests}
+                    onChange={(e) => setGuests(e.target.value)}
+                    className="booking-form-control"
+                  >
+                    <option value="1">Solo Traveler (1)</option>
+                    <option value="2">2 Travelers (Couple / Friends)</option>
+                    <option value="3">3 Travelers</option>
+                    <option value="4">4 Travelers (Small Family)</option>
+                    <option value="5">5+ Travelers</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="booking-interest" className="booking-form-label">
+                    Primary Interest
+                  </label>
+                  <select
+                    id="booking-interest"
+                    value={activityInterest}
+                    onChange={(e) => setActivityInterest(e.target.value)}
+                    className="booking-form-control"
+                  >
+                    <option value="Village & Valley Discovery">Village & Valley Discovery</option>
+                    <option value="Cedar Forest & Waterfall Walks">Cedar Forest & Waterfall Walks</option>
+                    <option value="Kath-Kuni Heritage & Temples">Kath-Kuni Heritage & Temples</option>
+                    <option value="Traditional Food & Siddu Tasting">Traditional Food & Siddu Tasting</option>
+                    <option value="Quiet Nature & Photography">Quiet Nature & Photography</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '14px' }}>
+                <label htmlFor="booking-traveler-name" className="booking-form-label">
+                  Your Full Name *
+                </label>
+                <input
+                  id="booking-traveler-name"
+                  type="text"
+                  required
+                  value={travelerName}
+                  onChange={(e) => setTravelerName(e.target.value)}
+                  placeholder="e.g. Ananya Sen"
+                  className="booking-form-control"
+                />
+              </div>
+
+              <div className="booking-form-grid-2col">
+                <div>
+                  <label htmlFor="booking-traveler-email" className="booking-form-label">
+                    Email Address *
+                  </label>
+                  <input
+                    id="booking-traveler-email"
+                    type="email"
+                    required
+                    value={travelerEmail}
+                    onChange={(e) => setTravelerEmail(e.target.value)}
+                    placeholder="ananya@example.com"
+                    className="booking-form-control"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="booking-traveler-phone" className="booking-form-label">
+                    Phone / WhatsApp
+                  </label>
+                  <input
+                    id="booking-traveler-phone"
+                    type="tel"
+                    value={travelerPhone}
+                    onChange={(e) => setTravelerPhone(e.target.value)}
+                    placeholder="+91 98000 00000"
+                    className="booking-form-control"
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '14px' }}>
+                <label htmlFor="booking-message" className="booking-form-label">
+                  Note for your Local Host (Optional)
+                </label>
+                <textarea
+                  id="booking-message"
+                  rows={2}
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="Mention walking pace, interests, arrival points (e.g. arriving in Aut / Banjar)..."
+                  className="booking-form-control"
+                  style={{ minHeight: '64px', resize: 'vertical' }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* STEP 5: TRANSPARENT PRICING & SUBMIT */}
+          {step === 5 && (
+            <div>
+              <h3 id="booking-modal-title" className="booking-step-heading">
+                Step 5: Review & Send Request
+              </h3>
+              <p className="booking-step-desc">
+                Review the summary before dispatching. No upfront payment required; pay your host directly on meetup or UPI once accepted.
+              </p>
+
+              <div
+                style={{
+                  backgroundColor: 'var(--color-bg-surface-elevated, #FFFFFF)',
+                  borderRadius: '14px',
+                  padding: '16px 18px',
+                  border: '1px solid rgba(16, 38, 29, 0.1)',
+                  marginBottom: '18px',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', gap: '12px' }}>
+                  <span style={{ color: 'var(--color-text-muted, #536B5E)', fontSize: '13.5px' }}>Service / Provider:</span>
+                  <span style={{ fontWeight: 700, color: 'var(--color-text-main, #0C2017)', fontSize: '13.5px', textAlign: 'right' }}>
+                    {targetItem.name || targetItem.title}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', gap: '12px' }}>
+                  <span style={{ color: 'var(--color-text-muted, #536B5E)', fontSize: '13.5px' }}>Date & Window:</span>
+                  <span style={{ fontWeight: 600, color: 'var(--color-text-main, #0C2017)', fontSize: '13.5px', textAlign: 'right' }}>
+                    {travelDate} • {timeSlot === 'full_day' ? 'Full Day' : timeSlot === 'morning' ? 'Morning' : 'Afternoon'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', gap: '12px' }}>
+                  <span style={{ color: 'var(--color-text-muted, #536B5E)', fontSize: '13.5px' }}>Travelers:</span>
+                  <span style={{ fontWeight: 600, color: 'var(--color-text-main, #0C2017)', fontSize: '13.5px' }}>
+                    {guests} person(s)
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', gap: '12px' }}>
+                  <span style={{ color: 'var(--color-text-muted, #536B5E)', fontSize: '13.5px' }}>Pahadíly Platform Fee:</span>
+                  <span style={{ fontWeight: 600, color: 'var(--color-forest-light, #205540)', fontSize: '13.5px' }}>
+                    ₹0 (Fair Community Model)
+                  </span>
+                </div>
+                <div
+                  style={{
+                    borderTop: '1px dashed rgba(16, 38, 29, 0.15)',
+                    paddingTop: '10px',
+                    marginTop: '10px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '12px',
+                  }}
+                >
+                  <span style={{ fontWeight: 700, color: 'var(--color-text-main, #0C2017)', fontSize: '15px' }}>
+                    Estimated Host Honorarium:
+                  </span>
+                  <span style={{ fontWeight: 800, color: 'var(--color-forest-light, #205540)', fontSize: '19px' }}>
+                    ₹{estimatedTotal.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  backgroundColor: 'rgba(217, 197, 163, 0.22)',
+                  border: '1px solid rgba(217, 197, 163, 0.65)',
+                  padding: '12px 14px',
+                  borderRadius: '10px',
+                  fontSize: '12.5px',
+                  color: '#4A3D2E',
+                  marginBottom: '16px',
+                  lineHeight: 1.5,
+                }}
+              >
+                🌿 <strong>How Acceptance Works:</strong> Submitting sends a direct booking request to {targetItem.name || 'the local provider'}. Once they review and click <em>Accept</em>, your voucher turns to <strong>Confirmed</strong> and you receive meetup coordination details.
+              </div>
+            </div>
+          )}
+
+          {/* STEP 6: VOUCHER ISSUED */}
+          {step === 6 && submittedBooking && (
+            <div style={{ textAlign: 'center', padding: '8px 0' }}>
               <div
                 style={{
                   width: '64px',
                   height: '64px',
-                  borderRadius: '12px',
-                  backgroundColor: '#174D39',
-                  color: '#FFFFFF',
+                  borderRadius: '50%',
+                  backgroundColor: 'rgba(142, 228, 154, 0.25)',
+                  color: 'var(--color-forest-light, #205540)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '28px',
-                  flexShrink: 0,
-                  overflow: 'hidden',
+                  fontSize: '30px',
+                  margin: '0 auto 14px auto',
                 }}
               >
-                {targetItem.image ? (
-                  <img
-                    src={targetItem.image}
-                    alt={targetItem.name || targetItem.title}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
-                  />
-                ) : (
-                  '🌲'
-                )}
+                ✓
               </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                  <h4 style={{ margin: 0, fontSize: '18px', color: '#10251D', fontWeight: 700 }}>
-                    {targetItem.name || targetItem.title || 'Local Companion'}
-                  </h4>
-                  <span
-                    style={{
-                      fontSize: '11px',
-                      padding: '2px 8px',
-                      borderRadius: '9999px',
-                      backgroundColor: 'rgba(23, 77, 57, 0.12)',
-                      color: '#174D39',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Verified Local
-                  </span>
-                </div>
-                <div style={{ fontSize: '13px', color: '#536B5E', marginBottom: '6px' }}>
-                  📍 {targetItem.location || 'Kullu District, Himachal Pradesh'} • {targetItem.role || targetItem.duration || 'Himalayan Guide'}
-                </div>
-                <div style={{ fontSize: '15px', fontWeight: 700, color: '#174D39' }}>
-                  {rawPriceStr}{' '}
-                  <span style={{ fontSize: '12px', fontWeight: 500, color: '#536B5E' }}>
-                    {targetItem.unit || '/day'}
-                  </span>
-                </div>
+              <span
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  color: 'var(--color-forest-light, #205540)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.1em',
+                }}
+              >
+                Request Dispatched to Provider
+              </span>
+              <h3 id="booking-modal-title" style={{ fontFamily: 'var(--font-serif)', fontSize: '24px', color: 'var(--color-text-main, #0C2017)', margin: '6px 0 10px 0' }}>
+                Pahadíly Voucher #{submittedBooking.id}
+              </h3>
+              <p style={{ color: 'var(--color-text-muted, #536B5E)', fontSize: '13.5px', lineHeight: 1.5, marginBottom: '18px' }}>
+                Your request for <strong>{submittedBooking.item_title}</strong> on{' '}
+                <strong>{submittedBooking.travel_date}</strong> is now pending confirmation with{' '}
+                <strong>{submittedBooking.provider_name}</strong>.
+              </p>
+
+              <div
+                style={{
+                  backgroundColor: 'var(--color-bg-surface-elevated, #FFFFFF)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  border: '1px solid rgba(16, 38, 29, 0.1)',
+                  textAlign: 'left',
+                  fontSize: '13px',
+                  lineHeight: 1.6,
+                  marginBottom: '20px',
+                }}
+              >
+                <div><strong>Status:</strong> <span style={{ color: 'var(--color-gold-warm, #d99a38)', fontWeight: 700 }}>Pending Host Acceptance</span></div>
+                <div><strong>Traveler:</strong> {submittedBooking.traveler_name} ({submittedBooking.traveler_email})</div>
+                <div><strong>Estimated Honorarium:</strong> {submittedBooking.total_price}</div>
+                <div><strong>Payment:</strong> Pay on Meetup (Cash or UPI)</div>
+                <div><strong>Reference Code:</strong> {submittedBooking.transaction_ref}</div>
               </div>
             </div>
+          )}
+        </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+        {/* Modal Action Footer */}
+        <div className="booking-modal-footer">
+          {step === 1 && (
+            <>
               <button
                 type="button"
                 onClick={closeModal}
-                style={{
-                  padding: '10px 18px',
-                  borderRadius: '9999px',
-                  color: '#536B5E',
-                  fontWeight: 600,
-                  fontSize: '14px',
-                }}
+                className="booking-btn-back"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleNext}
-                style={{
-                  padding: '10px 24px',
-                  borderRadius: '9999px',
-                  backgroundColor: '#174D39',
-                  color: '#FFFFFF',
-                  fontWeight: 600,
-                  fontSize: '14px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 14px rgba(23, 77, 57, 0.25)',
-                }}
+                className="booking-btn-primary"
               >
                 Proceed to Date Selection →
               </button>
-            </div>
-          </div>
-        )}
+            </>
+          )}
 
-        {/* STEP 2: CHOOSE DATE */}
-        {step === 2 && (
-          <div>
-            <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: '24px', color: '#10251D', margin: '0 0 10px 0' }}>
-              Step 2: When are you visiting?
-            </h3>
-            <p style={{ color: '#536B5E', fontSize: '14px', marginBottom: '18px' }}>
-              Select your travel date. We automatically verify provider availability to prevent double-booking.
-            </p>
-
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#10251D', marginBottom: '6px' }}>
-                Trip Date
-              </label>
-              <input
-                type="date"
-                min={new Date().toISOString().slice(0, 10)}
-                value={travelDate}
-                onChange={(e) => setTravelDate(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '12px 14px',
-                  borderRadius: '10px',
-                  border: '1px solid rgba(16, 38, 29, 0.2)',
-                  fontSize: '15px',
-                  backgroundColor: '#FFFFFF',
-                  color: '#10251D',
-                  boxSizing: 'border-box',
-                }}
-              />
-            </div>
-
-            {isDateConflicting ? (
-              <div
-                style={{
-                  backgroundColor: 'rgba(200, 109, 81, 0.12)',
-                  border: '1px solid #c86d51',
-                  color: '#a3391b',
-                  padding: '12px',
-                  borderRadius: '10px',
-                  fontSize: '13px',
-                  marginBottom: '20px',
-                }}
-              >
-                ⚠️ <strong>Slot Conflict:</strong> This provider is already engaged on {travelDate}. Please choose a different date.
-              </div>
-            ) : (
-              <div
-                style={{
-                  backgroundColor: 'rgba(23, 77, 57, 0.08)',
-                  border: '1px solid rgba(23, 77, 57, 0.2)',
-                  color: '#174D39',
-                  padding: '12px',
-                  borderRadius: '10px',
-                  fontSize: '13px',
-                  marginBottom: '20px',
-                }}
-              >
-                ✅ <strong>Available:</strong> The provider currently has an open slot on {travelDate}.
-              </div>
-            )}
-
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          {step === 2 && (
+            <>
               <button
                 type="button"
                 onClick={handleBack}
-                style={{ padding: '10px 18px', borderRadius: '9999px', color: '#536B5E', fontWeight: 600, fontSize: '14px' }}
+                className="booking-btn-back"
               >
                 ← Back
               </button>
@@ -400,348 +671,58 @@ export default function BookingModal() {
                 type="button"
                 onClick={handleNext}
                 disabled={isDateConflicting}
-                style={{
-                  padding: '10px 24px',
-                  borderRadius: '9999px',
-                  backgroundColor: isDateConflicting ? '#B0ACA2' : '#174D39',
-                  color: '#FFFFFF',
-                  fontWeight: 600,
-                  fontSize: '14px',
-                  cursor: isDateConflicting ? 'not-allowed' : 'pointer',
-                }}
+                className="booking-btn-primary"
               >
                 Choose Time Slot →
               </button>
-            </div>
-          </div>
-        )}
+            </>
+          )}
 
-        {/* STEP 3: TIME SLOT */}
-        {step === 3 && (
-          <div>
-            <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: '24px', color: '#10251D', margin: '0 0 10px 0' }}>
-              Step 3: Select Time Window
-            </h3>
-            <p style={{ color: '#536B5E', fontSize: '14px', marginBottom: '20px' }}>
-              Choose whether you want morning exploration, afternoon heritage walks, or a full day companionship.
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
-              {[
-                { id: 'morning', title: 'Morning Exploration', desc: '09:00 AM – 01:00 PM • Best for crisp mountain air and clear valley views' },
-                { id: 'afternoon', title: 'Afternoon & Golden Hour', desc: '02:00 PM – 06:00 PM • Best for village strolls, chai, and sunset ridges' },
-                { id: 'full_day', title: 'Full Day Immersion', desc: '09:30 AM – 05:30 PM • Complete day accompanied with local hidden spots' },
-              ].map((slot) => (
-                <label
-                  key={slot.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '12px',
-                    padding: '14px',
-                    borderRadius: '12px',
-                    border: `1.5px solid ${timeSlot === slot.id ? '#174D39' : 'rgba(16, 38, 29, 0.12)'}`,
-                    backgroundColor: timeSlot === slot.id ? 'rgba(23, 77, 57, 0.06)' : '#FFFFFF',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <input
-                    type="radio"
-                    name="timeSlot"
-                    value={slot.id}
-                    checked={timeSlot === slot.id}
-                    onChange={() => setTimeSlot(slot.id)}
-                    style={{ marginTop: '3px' }}
-                  />
-                  <div>
-                    <div style={{ fontWeight: 700, color: '#10251D', fontSize: '15px' }}>{slot.title}</div>
-                    <div style={{ fontSize: '13px', color: '#536B5E', marginTop: '2px' }}>{slot.desc}</div>
-                  </div>
-                </label>
-              ))}
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          {step === 3 && (
+            <>
               <button
                 type="button"
                 onClick={handleBack}
-                style={{ padding: '10px 18px', borderRadius: '9999px', color: '#536B5E', fontWeight: 600, fontSize: '14px' }}
+                className="booking-btn-back"
               >
                 ← Back
               </button>
               <button
                 type="button"
                 onClick={handleNext}
-                style={{
-                  padding: '10px 24px',
-                  borderRadius: '9999px',
-                  backgroundColor: '#174D39',
-                  color: '#FFFFFF',
-                  fontWeight: 600,
-                  fontSize: '14px',
-                }}
+                className="booking-btn-primary"
               >
                 Traveler Details →
               </button>
-            </div>
-          </div>
-        )}
+            </>
+          )}
 
-        {/* STEP 4: TRAVELER DETAILS & INTERESTS */}
-        {step === 4 && (
-          <div>
-            <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: '24px', color: '#10251D', margin: '0 0 10px 0' }}>
-              Step 4: Who is visiting?
-            </h3>
-            <p style={{ color: '#536B5E', fontSize: '14px', marginBottom: '18px' }}>
-              Help your local provider prepare for your pace, interests, and party size.
-            </p>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#10251D', marginBottom: '4px' }}>
-                  Number of Travelers
-                </label>
-                <select
-                  value={guests}
-                  onChange={(e) => setGuests(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(16, 38, 29, 0.2)',
-                    fontSize: '14px',
-                    backgroundColor: '#FFFFFF',
-                  }}
-                >
-                  <option value="1">Solo Traveler (1)</option>
-                  <option value="2">2 Travelers (Couple / Friends)</option>
-                  <option value="3">3 Travelers</option>
-                  <option value="4">4 Travelers (Small Family)</option>
-                  <option value="5">5+ Travelers</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#10251D', marginBottom: '4px' }}>
-                  Primary Interest
-                </label>
-                <select
-                  value={activityInterest}
-                  onChange={(e) => setActivityInterest(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(16, 38, 29, 0.2)',
-                    fontSize: '14px',
-                    backgroundColor: '#FFFFFF',
-                  }}
-                >
-                  <option value="Village & Valley Discovery">Village & Valley Discovery</option>
-                  <option value="Cedar Forest & Waterfall Walks">Cedar Forest & Waterfall Walks</option>
-                  <option value="Kath-Kuni Heritage & Temples">Kath-Kuni Heritage & Temples</option>
-                  <option value="Traditional Food & Siddu Tasting">Traditional Food & Siddu Tasting</option>
-                  <option value="Quiet Nature & Photography">Quiet Nature & Photography</option>
-                </select>
-              </div>
-            </div>
-
-            <div style={{ marginBottom: '14px' }}>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#10251D', marginBottom: '4px' }}>
-                Your Full Name *
-              </label>
-              <input
-                type="text"
-                required
-                value={travelerName}
-                onChange={(e) => setTravelerName(e.target.value)}
-                placeholder="e.g. Ananya Sen"
-                style={{
-                  width: '100%',
-                  padding: '10px 14px',
-                  borderRadius: '8px',
-                  border: '1px solid rgba(16, 38, 29, 0.2)',
-                  fontSize: '14px',
-                  backgroundColor: '#FFFFFF',
-                  boxSizing: 'border-box',
-                }}
-              />
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#10251D', marginBottom: '4px' }}>
-                  Email Address *
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={travelerEmail}
-                  onChange={(e) => setTravelerEmail(e.target.value)}
-                  placeholder="ananya@example.com"
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(16, 38, 29, 0.2)',
-                    fontSize: '14px',
-                    backgroundColor: '#FFFFFF',
-                    boxSizing: 'border-box',
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#10251D', marginBottom: '4px' }}>
-                  Phone / WhatsApp
-                </label>
-                <input
-                  type="tel"
-                  value={travelerPhone}
-                  onChange={(e) => setTravelerPhone(e.target.value)}
-                  placeholder="+91 98000 00000"
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(16, 38, 29, 0.2)',
-                    fontSize: '14px',
-                    backgroundColor: '#FFFFFF',
-                    boxSizing: 'border-box',
-                  }}
-                />
-              </div>
-            </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#10251D', marginBottom: '4px' }}>
-                Note for your Local Host (Optional)
-              </label>
-              <textarea
-                rows={2}
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Mention walking pace, interests, arrival points (e.g. arriving in Aut / Banjar)..."
-                style={{
-                  width: '100%',
-                  padding: '10px 14px',
-                  borderRadius: '8px',
-                  border: '1px solid rgba(16, 38, 29, 0.2)',
-                  fontSize: '14px',
-                  backgroundColor: '#FFFFFF',
-                  boxSizing: 'border-box',
-                }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          {step === 4 && (
+            <>
               <button
                 type="button"
                 onClick={handleBack}
-                style={{ padding: '10px 18px', borderRadius: '9999px', color: '#536B5E', fontWeight: 600, fontSize: '14px' }}
+                className="booking-btn-back"
               >
                 ← Back
               </button>
               <button
                 type="button"
                 onClick={handleNext}
-                style={{
-                  padding: '10px 24px',
-                  borderRadius: '9999px',
-                  backgroundColor: '#174D39',
-                  color: '#FFFFFF',
-                  fontWeight: 600,
-                  fontSize: '14px',
-                }}
+                className="booking-btn-primary"
               >
                 Review & Price →
               </button>
-            </div>
-          </div>
-        )}
+            </>
+          )}
 
-        {/* STEP 5: TRANSPARENT PRICING & SUBMIT */}
-        {step === 5 && (
-          <div>
-            <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: '24px', color: '#10251D', margin: '0 0 10px 0' }}>
-              Step 5: Review & Send Request
-            </h3>
-            <p style={{ color: '#536B5E', fontSize: '14px', marginBottom: '18px' }}>
-              Review the summary before dispatching. No upfront payment required; pay your host directly on meetup or UPI once accepted.
-            </p>
-
-            <div
-              style={{
-                backgroundColor: '#FFFFFF',
-                borderRadius: '14px',
-                padding: '18px',
-                border: '1px solid rgba(16, 38, 29, 0.1)',
-                marginBottom: '20px',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ color: '#536B5E', fontSize: '14px' }}>Service / Provider:</span>
-                <span style={{ fontWeight: 700, color: '#10251D', fontSize: '14px' }}>
-                  {targetItem.name || targetItem.title}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ color: '#536B5E', fontSize: '14px' }}>Date & Window:</span>
-                <span style={{ fontWeight: 600, color: '#10251D', fontSize: '14px' }}>
-                  {travelDate} • {timeSlot === 'full_day' ? 'Full Day' : timeSlot === 'morning' ? 'Morning' : 'Afternoon'}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ color: '#536B5E', fontSize: '14px' }}>Travelers:</span>
-                <span style={{ fontWeight: 600, color: '#10251D', fontSize: '14px' }}>
-                  {guests} person(s)
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ color: '#536B5E', fontSize: '14px' }}>Pahadíly Platform Fee:</span>
-                <span style={{ fontWeight: 600, color: '#174D39', fontSize: '14px' }}>
-                  ₹0 (Fair Community Model)
-                </span>
-              </div>
-              <div
-                style={{
-                  borderTop: '1px dashed rgba(16, 38, 29, 0.15)',
-                  paddingTop: '10px',
-                  marginTop: '10px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <span style={{ fontWeight: 700, color: '#10251D', fontSize: '16px' }}>Estimated Host Honorarium:</span>
-                <span style={{ fontWeight: 800, color: '#174D39', fontSize: '20px' }}>
-                  ₹{estimatedTotal.toLocaleString()}
-                </span>
-              </div>
-            </div>
-
-            <div
-              style={{
-                backgroundColor: 'rgba(217, 197, 163, 0.2)',
-                border: '1px solid rgba(217, 197, 163, 0.6)',
-                padding: '12px',
-                borderRadius: '10px',
-                fontSize: '12px',
-                color: '#4A3D2E',
-                marginBottom: '24px',
-                lineHeight: 1.5,
-              }}
-            >
-              🌿 <strong>How Acceptance Works:</strong> Submitting sends a direct booking request to {targetItem.name || 'the local provider'}. Once they review and click <em>Accept</em>, your voucher turns to <strong>Confirmed</strong> and you receive meetup coordination details.
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          {step === 5 && (
+            <>
               <button
                 type="button"
                 onClick={handleBack}
                 disabled={loading}
-                style={{ padding: '10px 18px', borderRadius: '9999px', color: '#536B5E', fontWeight: 600, fontSize: '14px' }}
+                className="booking-btn-back"
               >
                 ← Back
               </button>
@@ -749,121 +730,35 @@ export default function BookingModal() {
                 type="button"
                 onClick={handleSubmitRequest}
                 disabled={loading}
-                style={{
-                  padding: '12px 28px',
-                  borderRadius: '9999px',
-                  backgroundColor: '#174D39',
-                  color: '#FFFFFF',
-                  fontWeight: 700,
-                  fontSize: '15px',
-                  border: 'none',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  boxShadow: '0 6px 18px rgba(23, 77, 57, 0.3)',
-                }}
+                className="booking-btn-primary"
               >
                 {loading ? 'Submitting to Local Host...' : 'Submit Booking Request ✓'}
               </button>
-            </div>
-          </div>
-        )}
+            </>
+          )}
 
-        {/* STEP 6: VOUCHER ISSUED */}
-        {step === 6 && submittedBooking && (
-          <div style={{ textAlign: 'center' }}>
-            <div
-              style={{
-                width: '68px',
-                height: '68px',
-                borderRadius: '50%',
-                backgroundColor: 'rgba(142, 228, 154, 0.25)',
-                color: '#174D39',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '32px',
-                margin: '0 auto 16px auto',
-              }}
-            >
-              ✓
-            </div>
-            <span
-              style={{
-                fontSize: '11px',
-                fontWeight: 700,
-                color: '#174D39',
-                textTransform: 'uppercase',
-                letterSpacing: '0.1em',
-              }}
-            >
-              Request Dispatched to Provider
-            </span>
-            <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: '26px', color: '#10251D', margin: '6px 0 10px 0' }}>
-              Pahadíly Voucher #{submittedBooking.id}
-            </h3>
-            <p style={{ color: '#536B5E', fontSize: '14px', lineHeight: 1.5, marginBottom: '20px' }}>
-              Your request for <strong>{submittedBooking.item_title}</strong> on{' '}
-              <strong>{submittedBooking.travel_date}</strong> is now pending confirmation with{' '}
-              <strong>{submittedBooking.provider_name}</strong>.
-            </p>
-
-            <div
-              style={{
-                backgroundColor: '#FFFFFF',
-                borderRadius: '12px',
-                padding: '16px',
-                border: '1px solid rgba(16, 38, 29, 0.1)',
-                textAlign: 'left',
-                fontSize: '13px',
-                lineHeight: 1.6,
-                marginBottom: '24px',
-              }}
-            >
-              <div><strong>Status:</strong> <span style={{ color: '#d99a38', fontWeight: 700 }}>Pending Host Acceptance</span></div>
-              <div><strong>Traveler:</strong> {submittedBooking.traveler_name} ({submittedBooking.traveler_email})</div>
-              <div><strong>Estimated Honorarium:</strong> {submittedBooking.total_price}</div>
-              <div><strong>Payment:</strong> Pay on Meetup (Cash or UPI)</div>
-              <div><strong>Reference Code:</strong> {submittedBooking.transaction_ref}</div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+          {step === 6 && (
+            <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={closeModal}
+                className="booking-btn-back"
+              >
+                Close
+              </button>
               <button
                 type="button"
                 onClick={() => {
                   closeModal();
                   openMyBookings();
                 }}
-                style={{
-                  padding: '10px 20px',
-                  borderRadius: '9999px',
-                  backgroundColor: '#174D39',
-                  color: '#FFFFFF',
-                  fontWeight: 600,
-                  fontSize: '14px',
-                  border: 'none',
-                  cursor: 'pointer',
-                }}
+                className="booking-btn-primary"
               >
                 View in "My Bookings" →
               </button>
-              <button
-                type="button"
-                onClick={closeModal}
-                style={{
-                  padding: '10px 18px',
-                  borderRadius: '9999px',
-                  backgroundColor: 'transparent',
-                  color: '#536B5E',
-                  fontWeight: 600,
-                  fontSize: '14px',
-                  border: '1px solid rgba(16, 38, 29, 0.2)',
-                  cursor: 'pointer',
-                }}
-              >
-                Close
-              </button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
