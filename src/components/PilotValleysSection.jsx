@@ -1,78 +1,40 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-
-const PILOT_VALLEYS_DATA = [
-  {
-    id: 'tirthan',
-    name: 'Tirthan Valley',
-    tagline: 'Crystal rivers, deodar forests, and UNESCO GHNP trails',
-    altitude: '1,600m',
-    image: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80',
-    highlights: 'Jalori Pass, Serolsar Lake, Chhoie Waterfall, Great Himalayan National Park',
-    tags: ['Trout River', 'UNESCO GHNP', 'Kath-Kuni'],
-    bestSeason: 'March to November',
-    companionsCount: 4,
-    description: 'Carved by the pristine glacial Tirthan river, this valley serves as the gateway to the Great Himalayan National Park. Lush with walnut and deodar forests, ancient stone-and-timber hamlets, and crystalline angling streams.',
-  },
-  {
-    id: 'jibhi',
-    name: 'Jibhi',
-    tagline: 'Quiet pine hamlets, stone-and-timber architectural heritage',
-    altitude: '1,880m',
-    image: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=800&q=80',
-    highlights: 'Chehni Kothi 1,500-year fortress tower, Shringa Rishi Temple, hidden waterfalls',
-    tags: ['Heritage Fort', 'Pine Forests', 'Waterfalls'],
-    bestSeason: 'Throughout the year',
-    companionsCount: 6,
-    description: 'An idyllic Himalayan haven nestled in Banjar sub-division. Famous for centuries-old multistory Kath-Kuni fortresses, murmuring streams crossed by wooden footbridges, and gentle walking trails through cedar glades.',
-  },
-  {
-    id: 'shangarh',
-    name: 'Shangarh (Sainj)',
-    tagline: 'Vast sacred alpine meadow protected by Shangchul Mahadev',
-    altitude: '2,100m',
-    image: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=800&q=80',
-    highlights: 'Sacred meadow, pagoda temples, Sainj river wildlife sanctuary',
-    tags: ['Sacred Meadow', 'Pagoda Temple', 'Serenity'],
-    bestSeason: 'April to October',
-    companionsCount: 3,
-    description: 'A mystical high alpine bowl encircled by towering Himalayan cedar pines. The sacred meadow has been safeguarded for centuries under ancient devta rules prohibiting noise and contamination.',
-  },
-  {
-    id: 'naggar',
-    name: 'Naggar',
-    tagline: 'Ancient Kullu royal capital, timber castellation, and Russian art history',
-    altitude: '1,760m',
-    image: 'https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?auto=format&fit=crop&w=800&q=80',
-    highlights: 'Naggar Castle, Nicholas Roerich Estate, Tripura Sundari pagoda, Jana Falls',
-    tags: ['Royal Castle', 'Himalayan Art', 'Orchards'],
-    bestSeason: 'March to December',
-    companionsCount: 5,
-    description: 'Perched high above the Beas river, Naggar was the capital of the Kullu Rajas for 1,400 years. Famous for the earthquake-resistant timber castle, Nicholas Roerich gallery, and cascading stone watermills.',
-  },
-  {
-    id: 'lug-valley',
-    name: 'Lug Valley',
-    tagline: 'Untouched western tributary valley of Kullu, wild deodar ridges',
-    altitude: '1,950m',
-    image: 'https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=800&q=80',
-    highlights: 'Chanderkhani western flanks, traditional shepherd trails, organic apple orchards',
-    tags: ['Unexplored', 'Shepherd Paths', 'Wild Ridges'],
-    bestSeason: 'April to November',
-    companionsCount: 2,
-    description: 'One of Kullu district’s least-commercialized valleys, branching westward into secluded shepherd trails and wild ridges where traditional village life continues unchanged.',
-  },
-];
+import { getLocations } from '../lib/api';
 
 export default function PilotValleysSection() {
-  const { openDestinationDetail, openBooking } = useAuth();
+  const { openDestinationDetail, refreshKey } = useAuth();
+  const [locationsList, setLocationsList] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedTag, setSelectedTag] = useState('All');
 
-  const allTags = ['All', 'Trout River', 'Heritage Fort', 'Sacred Meadow', 'Royal Castle', 'Unexplored'];
+  useEffect(() => {
+    setLoading(true);
+    getLocations({ status: 'published' })
+      .then((data) => {
+        setLocationsList(Array.isArray(data) ? data : []);
+      })
+      .catch((err) => {
+        console.warn('Could not load published locations:', err);
+        setLocationsList([]);
+      })
+      .finally(() => setLoading(false));
+  }, [refreshKey]);
 
-  const filteredValleys = PILOT_VALLEYS_DATA.filter((v) => {
+  // Extract real tags from genuine locations
+  const allTags = ['All'];
+  locationsList.forEach((loc) => {
+    if (Array.isArray(loc.tags)) {
+      loc.tags.forEach((t) => {
+        if (t && !allTags.includes(t)) allTags.push(t);
+      });
+    }
+  });
+
+  const filteredLocations = locationsList.filter((loc) => {
     if (selectedTag === 'All') return true;
-    return v.tags.includes(selectedTag);
+    return Array.isArray(loc.tags) && loc.tags.includes(selectedTag);
   });
 
   return (
@@ -91,7 +53,7 @@ export default function PilotValleysSection() {
               marginBottom: '8px',
             }}
           >
-            Phase 1 Pilot Region • Kullu District
+            Verified Destinations • Himachal Pradesh
           </span>
           <h2
             style={{
@@ -102,215 +64,285 @@ export default function PilotValleysSection() {
               lineHeight: 1.2,
             }}
           >
-            Pilot Valleys of Himachal Pradesh
+            Featured Himalayan Destinations
           </h2>
           <p style={{ color: '#536B5E', fontSize: '16px', lineHeight: 1.6, margin: 0 }}>
-            We begin our community initiative in Kullu district, focusing on lesser-known river basins, secluded wooden fortresses, and sacred meadows where local knowledge transforms the journey.
+            Every place listed here has been verified through our administrative governance framework, documenting genuine cultural sites, river corridors, and sacred settlements.
           </p>
 
-          {/* Filter pills */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginTop: '24px' }}>
-            {allTags.map((tag) => (
-              <button
-                key={tag}
-                onClick={() => setSelectedTag(tag)}
-                style={{
-                  padding: '6px 16px',
-                  borderRadius: '9999px',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  backgroundColor: selectedTag === tag ? 'var(--color-forest-light, #205540)' : 'var(--color-bg-card, #F3EFE6)',
-                  color: selectedTag === tag ? '#FFFFFF' : 'var(--color-text-main, #0C2017)',
-                  border: selectedTag === tag ? '1px solid #205540' : '1px solid rgba(10, 37, 27, 0.12)',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                {tag}
-              </button>
-            ))}
-          </div>
+          {/* Filter pills if multiple tags exist */}
+          {allTags.length > 2 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginTop: '24px' }}>
+              {allTags.map((tag) => (
+                <button
+                  key={tag}
+                  onClick={() => setSelectedTag(tag)}
+                  style={{
+                    padding: '6px 16px',
+                    borderRadius: '9999px',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    backgroundColor: selectedTag === tag ? 'var(--color-forest-light, #205540)' : 'var(--color-bg-card, #F3EFE6)',
+                    color: selectedTag === tag ? '#FFFFFF' : 'var(--color-text-main, #0C2017)',
+                    border: selectedTag === tag ? '1px solid #205540' : '1px solid rgba(10, 37, 27, 0.12)',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Valleys Grid */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
-            gap: '24px',
-          }}
-        >
-          {filteredValleys.map((valley) => (
-            <div
-              key={valley.id}
+        {/* Loading State */}
+        {loading && (
+          <div style={{ textAlign: 'center', padding: '60px 0', color: '#536B5E' }}>
+            <div style={{ fontSize: '28px', marginBottom: '12px' }}>🏔️</div>
+            <p style={{ fontSize: '15px' }}>Loading verified destinations...</p>
+          </div>
+        )}
+
+        {/* Empty State (Explicit requirement: When no genuine data is available, show honest empty state) */}
+        {!loading && filteredLocations.length === 0 && (
+          <div
+            style={{
+              maxWidth: '620px',
+              margin: '0 auto',
+              textAlign: 'center',
+              backgroundColor: '#FFFFFF',
+              borderRadius: '20px',
+              padding: '48px 32px',
+              border: '1px solid rgba(16, 37, 29, 0.08)',
+              boxShadow: '0 4px 20px rgba(16, 37, 29, 0.04)',
+            }}
+          >
+            <div style={{ fontSize: '42px', marginBottom: '16px' }}>🏔️</div>
+            <h3
               style={{
-                backgroundColor: 'var(--color-bg-surface-elevated, #FFFFFF)',
-                borderRadius: '14px',
-                overflow: 'hidden',
-                border: '1px solid rgba(10, 37, 27, 0.08)',
-                boxShadow: '0 2px 8px rgba(10, 37, 27, 0.04)',
-                display: 'flex',
-                flexDirection: 'column',
-                transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(101, 184, 142, 0.45)';
-                e.currentTarget.style.boxShadow = '0 6px 18px rgba(10, 37, 27, 0.08)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(10, 37, 27, 0.08)';
-                e.currentTarget.style.boxShadow = '0 2px 8px rgba(10, 37, 27, 0.04)';
+                fontFamily: "'Playfair Display', Georgia, serif",
+                fontSize: '24px',
+                color: '#10251D',
+                marginBottom: '10px',
               }}
             >
-              {/* Image Banner */}
-              <div style={{ position: 'relative', height: '210px', overflow: 'hidden' }}>
-                <img
-                  src={valley.image}
-                  alt={valley.name}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '12px',
-                    left: '12px',
-                    backgroundColor: 'rgba(10, 37, 27, 0.75)',
-                    backdropFilter: 'blur(4px)',
-                    color: '#8EE49A',
-                    padding: '4px 10px',
-                    borderRadius: '9999px',
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    letterSpacing: '0.04em',
-                  }}
-                >
-                  ⛰️ {valley.altitude}
-                </div>
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '12px',
-                    right: '12px',
-                    backgroundColor: 'rgba(247, 245, 238, 0.9)',
-                    color: '#174D39',
-                    padding: '4px 10px',
-                    borderRadius: '9999px',
-                    fontSize: '11px',
-                    fontWeight: 700,
-                  }}
-                >
-                  {valley.companionsCount} Local Guides
-                </div>
-              </div>
+              We're adding verified places to explore. Check back soon.
+            </h3>
+            <p style={{ fontSize: '14.5px', color: '#536B5E', lineHeight: 1.6, marginBottom: '24px' }}>
+              Pahadíly strictly presents admin-vetted locations with real photographs and verified coordinates. No fictional places or placeholder entries are shown.
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              <Link
+                to="/explore"
+                style={{
+                  padding: '11px 24px',
+                  borderRadius: '9999px',
+                  backgroundColor: '#174D39',
+                  color: '#FFFFFF',
+                  fontSize: '13.5px',
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                }}
+              >
+                Explore Verified Places
+              </Link>
+              <Link
+                to="/become-a-local"
+                style={{
+                  padding: '11px 24px',
+                  borderRadius: '9999px',
+                  backgroundColor: 'rgba(23, 77, 57, 0.08)',
+                  color: '#174D39',
+                  border: '1px solid rgba(23, 77, 57, 0.2)',
+                  fontSize: '13.5px',
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                }}
+              >
+                Become a Local Host / Guide
+              </Link>
+            </div>
+          </div>
+        )}
 
-              {/* Card Body */}
-              <div style={{ padding: '22px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                <h3
-                  style={{
-                    fontFamily: "'Playfair Display', Georgia, serif",
-                    fontSize: '22px',
-                    color: '#10251D',
-                    margin: '0 0 6px 0',
-                  }}
-                >
-                  {valley.name}
-                </h3>
-                <p style={{ color: '#536B5E', fontSize: '13px', lineHeight: 1.5, margin: '0 0 14px 0', flex: 1 }}>
-                  {valley.tagline}
-                </p>
-
+        {/* Real Locations Grid */}
+        {!loading && filteredLocations.length > 0 && (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+              gap: '24px',
+            }}
+          >
+            {filteredLocations.map((loc) => {
+              const coverImg = loc.cover_image || (loc.gallery && loc.gallery[0]?.url) || '';
+              return (
                 <div
+                  key={loc.id}
                   style={{
-                    fontSize: '12px',
-                    color: '#2b3f35',
-                    backgroundColor: '#FAF8F2',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    marginBottom: '16px',
-                    lineHeight: 1.4,
+                    backgroundColor: 'var(--color-bg-surface-elevated, #FFFFFF)',
+                    borderRadius: '16px',
+                    overflow: 'hidden',
+                    border: '1px solid rgba(10, 37, 27, 0.08)',
+                    boxShadow: '0 2px 10px rgba(10, 37, 27, 0.04)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(101, 184, 142, 0.45)';
+                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(10, 37, 27, 0.08)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(10, 37, 27, 0.08)';
+                    e.currentTarget.style.boxShadow = '0 2px 10px rgba(10, 37, 27, 0.04)';
                   }}
                 >
-                  <strong>Key Trails:</strong> {valley.highlights}
-                </div>
-
-                {/* Tags */}
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '18px' }}>
-                  {valley.tags.map((t) => (
-                    <span
-                      key={t}
+                  {/* Image Banner */}
+                  <div style={{ position: 'relative', height: '220px', backgroundColor: '#EBE7DE', overflow: 'hidden' }}>
+                    {coverImg ? (
+                      <img
+                        src={coverImg}
+                        alt={loc.name}
+                        loading="lazy"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#88988E', fontSize: '14px' }}>
+                        📷 Verified photos being curated
+                      </div>
+                    )}
+                    <div
                       style={{
+                        position: 'absolute',
+                        top: '12px',
+                        left: '12px',
+                        backgroundColor: 'rgba(10, 37, 27, 0.8)',
+                        backdropFilter: 'blur(4px)',
+                        color: '#8EE49A',
+                        padding: '4px 10px',
+                        borderRadius: '9999px',
                         fontSize: '11px',
-                        backgroundColor: '#F3EFE6',
-                        color: '#174D39',
-                        padding: '3px 8px',
-                        borderRadius: '4px',
-                        fontWeight: 600,
+                        fontWeight: 700,
+                        letterSpacing: '0.04em',
                       }}
                     >
-                      #{t}
-                    </span>
-                  ))}
-                </div>
+                      {loc.valley || loc.district}
+                    </div>
+                    {loc.category && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '12px',
+                          right: '12px',
+                          backgroundColor: 'rgba(247, 245, 238, 0.95)',
+                          color: '#174D39',
+                          padding: '4px 10px',
+                          borderRadius: '9999px',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          textTransform: 'capitalize',
+                        }}
+                      >
+                        {loc.category.replace(/-/g, ' ')}
+                      </div>
+                    )}
+                  </div>
 
-                {/* Action Buttons */}
-                <div style={{ display: 'flex', gap: '10px', marginTop: 'auto' }}>
-                  <button
-                    type="button"
-                    onClick={() => openDestinationDetail(valley)}
-                    style={{
-                      flex: 1,
-                      padding: '9px 14px',
-                      borderRadius: '8px',
-                      backgroundColor: '#FFFFFF',
-                      border: '1px solid rgba(10, 37, 27, 0.14)',
-                      color: 'var(--color-text-main, #0C2017)',
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      transition: 'background-color 0.15s ease',
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F3EFE6'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#FFFFFF'; }}
-                  >
-                    Valley Details
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      openBooking(
-                        {
-                          name: `Native Companion (${valley.name})`,
-                          location: `${valley.name}, Kullu`,
-                          role: 'Local Guide',
-                          price: '₹500',
-                          unit: '/day',
-                          id: 1,
-                        },
-                        'local'
-                      )
-                    }
-                    style={{
-                      flex: 1,
-                      padding: '9px 14px',
-                      borderRadius: '8px',
-                      backgroundColor: 'var(--color-forest-light, #205540)',
-                      color: '#FFFFFF',
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      border: 'none',
-                      cursor: 'pointer',
-                      transition: 'background-color 0.15s ease',
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-forest-dark, #0A251B)'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-forest-light, #205540)'; }}
-                  >
-                    Request Guide
-                  </button>
+                  {/* Card Body */}
+                  <div style={{ padding: '22px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ fontSize: '11.5px', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#688575', fontWeight: 700, marginBottom: '4px' }}>
+                      {loc.village ? `${loc.village}, ${loc.district}` : `${loc.district} District`}
+                    </div>
+                    <h3
+                      style={{
+                        fontFamily: "'Playfair Display', Georgia, serif",
+                        fontSize: '22px',
+                        color: '#10251D',
+                        margin: '0 0 8px 0',
+                      }}
+                    >
+                      {loc.name}
+                    </h3>
+                    <p style={{ color: '#536B5E', fontSize: '13.5px', lineHeight: 1.55, margin: '0 0 16px 0', flex: 1 }}>
+                      {loc.description ? (loc.description.length > 140 ? `${loc.description.slice(0, 140)}...` : loc.description) : 'Verified Himalayan destination.'}
+                    </p>
+
+                    {/* Best Time & Safety Information */}
+                    {(loc.best_time || loc.difficulty) && (
+                      <div
+                        style={{
+                          fontSize: '12px',
+                          color: '#2b3f35',
+                          backgroundColor: '#FAF8F2',
+                          padding: '10px 12px',
+                          borderRadius: '8px',
+                          marginBottom: '16px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          gap: '12px',
+                        }}
+                      >
+                        {loc.best_time && <span>🗓️ {loc.best_time}</span>}
+                        {loc.difficulty && <span>🥾 {loc.difficulty}</span>}
+                      </div>
+                    )}
+
+                    {/* Tags */}
+                    {Array.isArray(loc.tags) && loc.tags.length > 0 && (
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '18px' }}>
+                        {loc.tags.slice(0, 3).map((t) => (
+                          <span
+                            key={t}
+                            style={{
+                              fontSize: '11px',
+                              backgroundColor: '#F3EFE6',
+                              color: '#174D39',
+                              padding: '3px 8px',
+                              borderRadius: '4px',
+                              fontWeight: 600,
+                            }}
+                          >
+                            #{t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Action Button */}
+                    <button
+                      type="button"
+                      onClick={() => openDestinationDetail(loc)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 0',
+                        borderRadius: '9999px',
+                        border: '1px solid rgba(23, 77, 57, 0.25)',
+                        backgroundColor: 'transparent',
+                        color: '#174D39',
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'background-color 0.15s ease, color 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#174D39';
+                        e.currentTarget.style.color = '#FFFFFF';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                        e.currentTarget.style.color = '#174D39';
+                      }}
+                    >
+                      View Real Gallery & Details →
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </div>
-          ))}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </section>
   );

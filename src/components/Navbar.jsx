@@ -45,15 +45,14 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Strict desktop order required by specification:
-  // 1. Home, 2. Explore, 3. Experiences, 4. Local Companions, 5. Stays, 6. Stories
+  // Order of navigation links:
+  // 1. Home, 2. Explore, 3. Experiences, 4. Local Companions, 5. Stays
   const navLinks = [
     { name: 'Home', path: '/' },
     { name: 'Explore', path: '/explore' },
     { name: 'Experiences', path: '/experiences' },
     { name: 'Local Companions', path: '/companions' },
     { name: 'Stays', path: '/stays' },
-    { name: 'Stories', path: '/stories' },
   ];
 
   const isActive = (path) => {

@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -9,7 +9,6 @@ import ExplorePage from './pages/ExplorePage';
 import ExperiencesPage from './pages/ExperiencesPage';
 import CompanionsPage from './pages/CompanionsPage';
 import StaysPage from './pages/StaysPage';
-import StoriesPage from './pages/StoriesPage';
 import BecomeALocalPage from './pages/BecomeALocalPage';
 import MyBookingsPage from './pages/MyBookingsPage';
 import ProviderPortalPage from './pages/ProviderPortalPage';
@@ -48,7 +47,7 @@ function AppLayout() {
           <Route path="/companions" element={<CompanionsPage />} />
           <Route path="/locals" element={<CompanionsPage />} />
           <Route path="/stays" element={<StaysPage />} />
-          <Route path="/stories" element={<StoriesPage />} />
+          <Route path="/stories" element={<Navigate to="/explore" replace />} />
           <Route path="/become-a-local" element={<BecomeALocalPage />} />
           <Route path="/my-bookings" element={<MyBookingsPage />} />
           <Route path="/provider-portal" element={<ProviderPortalPage />} />

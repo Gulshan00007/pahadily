@@ -124,9 +124,28 @@ export default function AdminPortalModal() {
           <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: '26px', color: '#10251D', margin: '4px 0 6px 0' }}>
             Pahadíly Platform Operations
           </h2>
-          <p style={{ color: '#536B5E', fontSize: '14px', margin: 0 }}>
+          <p style={{ color: '#536B5E', fontSize: '14px', margin: '0 0 12px 0' }}>
             Curate pilot providers, review host applications, and monitor community booking throughput.
           </p>
+          <a
+            href="/admin"
+            onClick={closeModal}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 14px',
+              borderRadius: '9999px',
+              backgroundColor: '#174D39',
+              color: '#FFFFFF',
+              fontSize: '12px',
+              fontWeight: 700,
+              textDecoration: 'none',
+            }}
+          >
+            <span>Open Dedicated Admin Operations Page (Locations Directory)</span>
+            <span>↗</span>
+          </a>
         </div>
 
         {!isAdmin ? (

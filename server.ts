@@ -7,7 +7,6 @@ import path from "path";
 import { fileURLToPath } from "url";
 import pg from "pg";
 import nodemailer from "nodemailer";
-import { EXPLORE_DESTINATIONS } from "./src/data/exploreDestinationsData.js";
 
 const { Pool } = pg;
 const __filename = fileURLToPath(import.meta.url);
@@ -200,6 +199,54 @@ export interface EmailNotification {
   created_at: string;
 }
 
+export interface LocationImage {
+  id: string;
+  url: string;
+  caption?: string;
+  credit?: string;
+}
+
+export interface LocationItem {
+  id: number;
+  name: string;
+  slug: string;
+  district: string;
+  valley: string;
+  village?: string;
+  category: string;
+  description: string;
+  latitude: number | null;
+  longitude: number | null;
+  cover_image: string;
+  gallery: LocationImage[];
+  best_time?: string;
+  difficulty?: string;
+  safety_notes?: string;
+  tags: string[];
+  status: "draft" | "published" | "archived";
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LocationCategory {
+  id: string;
+  name: string;
+  icon?: string;
+  description?: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export const DEFAULT_ADMIN_CATEGORIES: LocationCategory[] = [
+  { id: "viewpoints", name: "Viewpoints", icon: "🏔️", description: "High-altitude mountain overlooks and sunrise ridges", is_active: true, created_at: new Date().toISOString() },
+  { id: "waterfalls", name: "Waterfalls", icon: "🌊", description: "Secluded glacial cascades and mountain streams", is_active: true, created_at: new Date().toISOString() },
+  { id: "villages", name: "Villages", icon: "🏡", description: "Ancient Himalayan settlement hamlets with traditional architecture", is_active: true, created_at: new Date().toISOString() },
+  { id: "meadows", name: "Meadows", icon: "🌿", description: "Sacred high-altitude alpine grasslands and cedar glades", is_active: true, created_at: new Date().toISOString() },
+  { id: "temples", name: "Temples", icon: "⛩️", description: "Historical pagoda-style devta shrines and sacred local sanctuaries", is_active: true, created_at: new Date().toISOString() },
+  { id: "cultural-sites", name: "Cultural Sites", icon: "🪵", description: "Indigenous craft workshops, watermills, and living cultural heritage", is_active: true, created_at: new Date().toISOString() },
+  { id: "trekking-destinations", name: "Trekking Destinations", icon: "🥾", description: "High-altitude mountain passes, alpine lakes, and backcountry walking trails", is_active: true, created_at: new Date().toISOString() },
+];
+
 // --- Storage Engine State & Dual-Mode Configuration ---
 export let activeStorageType: "postgres" | "local_json" = "local_json";
 let pgPool: pg.Pool | null = null;
@@ -211,6 +258,8 @@ const experiences = new Map<number, Experience>();
 const locals = new Map<number, Local>();
 const bookings = new Map<number, Booking>();
 const hostApplications = new Map<number, HostApplication>();
+const locations = new Map<number, LocationItem>();
+const categories = new Map<string, LocationCategory>();
 const emailNotifications: EmailNotification[] = [];
 
 let nextUserId = 1;
@@ -221,6 +270,7 @@ let nextLocalId = 1;
 let nextBookingId = 1001;
 let nextHostAppId = 1;
 let nextNotificationId = 1;
+let nextLocationId = 1;
 
 // --- JSON Disk Persistence Path ---
 const DB_FILE = path.resolve(__dirname, "data", "pahadily_db_state.json");
@@ -240,6 +290,8 @@ function saveDbState() {
       locals: Array.from(locals.entries()),
       bookings: Array.from(bookings.entries()),
       hostApplications: Array.from(hostApplications.entries()),
+      locations: Array.from(locations.entries()),
+      categories: Array.from(categories.entries()),
       emailNotifications,
       nextUserId,
       nextPlaceId,
@@ -249,6 +301,7 @@ function saveDbState() {
       nextBookingId,
       nextHostAppId,
       nextNotificationId,
+      nextLocationId,
     };
     fs.writeFileSync(DB_FILE, JSON.stringify(state, null, 2), "utf-8");
   } catch (err) {
@@ -268,6 +321,8 @@ function loadDbState(): boolean {
       if (state.locals) for (const [k, v] of state.locals) locals.set(k, v);
       if (state.bookings) for (const [k, v] of state.bookings) bookings.set(k, v);
       if (state.hostApplications) for (const [k, v] of state.hostApplications) hostApplications.set(k, v);
+      if (state.locations) for (const [k, v] of state.locations) locations.set(k, v);
+      if (state.categories) for (const [k, v] of state.categories) categories.set(k, v);
       if (Array.isArray(state.emailNotifications)) {
         emailNotifications.length = 0;
         emailNotifications.push(...state.emailNotifications);
@@ -280,7 +335,8 @@ function loadDbState(): boolean {
       if (state.nextBookingId) nextBookingId = Math.max(nextBookingId, state.nextBookingId);
       if (state.nextHostAppId) nextHostAppId = Math.max(nextHostAppId, state.nextHostAppId);
       if (state.nextNotificationId) nextNotificationId = Math.max(nextNotificationId, state.nextNotificationId);
-      console.log(`[Storage] Loaded JSON persistence from ${DB_FILE} with ${places.size} places, ${locals.size} locals, and ${bookings.size} bookings.`);
+      if (state.nextLocationId) nextLocationId = Math.max(nextLocationId, state.nextLocationId);
+      console.log(`[Storage] Loaded JSON persistence from ${DB_FILE} with ${locations.size} locations, ${categories.size} categories, and ${bookings.size} bookings.`);
       return true;
     }
   } catch (err) {
@@ -308,202 +364,15 @@ function initSeedData() {
     is_verified: true,
     created_at: new Date().toISOString(),
   };
-  users.set(adminUser.id, adminUser);
-
-  // Load Verified Catalog Data from EXPLORE_DESTINATIONS
-  if (Array.isArray(EXPLORE_DESTINATIONS)) {
-    EXPLORE_DESTINATIONS.forEach((dest: any, idx: number) => {
-      const id = idx + 1;
-      const flagshipStay = dest.stays?.[0];
-      places.set(id, {
-        id,
-        name: dest.name,
-        tagline: dest.badge || dest.idealFor || "Himalayan Sanctuary",
-        region: dest.region || dest.id,
-        district: dest.district || "Kullu",
-        category: dest.subValley || "valley",
-        price: flagshipStay?.price || "₹1,800",
-        unit: flagshipStay?.unit || "/night",
-        rating: 4.9,
-        reviews: 142,
-        altitude: dest.elevation || "1,600m",
-        tags: dest.idealFor ? dest.idealFor.split(", ") : ["Nature", "Kath-Kuni", "Serenity"],
-        image: dest.images?.[0] || dest.image || "/images/destinations/tirthan-valley.jpg",
-        description: dest.description || "",
-        host_name: flagshipStay?.hostName || "Verified Local Host",
-        latitude: dest.latitude ?? 31.639,
-        longitude: dest.longitude ?? 77.3845,
-        nearby_locations: dest.nearbyAttractions || [],
-        stay_options: dest.stays || [],
-        created_at: new Date().toISOString(),
-      });
-      if (id >= nextPlaceId) nextPlaceId = id + 1;
-    });
+  if (!users.has(1)) {
+    users.set(adminUser.id, adminUser);
   }
 
-  // Load Verified Experiences
-  const verifiedExperiences = [
-    {
-      id: 1,
-      title: "Hidden Cedar Forest Walk",
-      region: "jibhi",
-      location: "Jibhi, Himachal Pradesh",
-      category: "nature",
-      duration: "2–3 hours",
-      difficulty: "Easy",
-      price: "₹500",
-      unit: "per person",
-      guide: "Rahul (Local Companion)",
-      rating: 4.8,
-      reviews: 120,
-      image: "/images/experiences/forest-walk.jpg",
-      description: "Gentle walking trail through ancient deodar pine glades with secret waterfall nooks.",
-      inclusions: ["Local walking guide", "Herbal mountain chai", "Forest flora insights"],
-    },
-    {
-      id: 2,
-      title: "Authentic Himachali Home Meal",
-      region: "kullu",
-      location: "Kullu, Himachal Pradesh",
-      category: "food",
-      duration: "2 hours",
-      difficulty: "Food Experience",
-      price: "₹350",
-      unit: "per person",
-      guide: "Sushma (Local Host)",
-      rating: 4.9,
-      reviews: 86,
-      image: "/images/experiences/home-meal.jpg",
-      description: "Traditional Siddu, ghee, mountain walnut chutney, and wood-fired dham lunch.",
-      inclusions: ["Full Himachali meal", "Traditional kitchen tour", "Family recipe sharing"],
-    },
-    {
-      id: 3,
-      title: "Sunrise Viewpoint Ridge Trek",
-      region: "jibhi",
-      location: "Jibhi, Himachal Pradesh",
-      category: "adventure",
-      duration: "3–4 hours",
-      difficulty: "Moderate",
-      price: "₹700",
-      unit: "per person",
-      guide: "Aman (Local Guide)",
-      rating: 4.7,
-      reviews: 64,
-      image: "/images/experiences/sunrise-trek.jpg",
-      description: "Ascend to high alpine ridges overlooking snowcapped Great Himalayan peaks at golden dawn.",
-      inclusions: ["Experienced mountain escort", "Trekking poles", "Hot flask tea"],
-    },
-    {
-      id: 4,
-      title: "Village Life & Handloom Walk",
-      region: "tirthan",
-      location: "Tirthan Valley, Himachal Pradesh",
-      category: "culture",
-      duration: "2–3 hours",
-      difficulty: "Cultural",
-      price: "₹450",
-      unit: "per person",
-      guide: "Meena (Local Host)",
-      rating: 4.8,
-      reviews: 92,
-      image: "/images/experiences/village-walk.jpg",
-      description: "Discover Kath-Kuni heritage architecture, traditional wool weaving, and organic apple orchards.",
-      inclusions: ["Village entry & tour", "Handloom demonstration", "Organic orchard fruits"],
-    },
-    {
-      id: 5,
-      title: "Riverside Camping & Stargazing",
-      region: "tirthan",
-      location: "Tirthan Valley, Himachal Pradesh",
-      category: "nature",
-      duration: "1 Night",
-      difficulty: "Camping",
-      price: "₹1,200",
-      unit: "per person",
-      guide: "Karan (Local Guide)",
-      rating: 4.9,
-      reviews: 78,
-      image: "/images/experiences/riverside-camp.jpg",
-      description: "Sleep under pristine dark skies beside the bubbling glacial Tirthan stream with bonfire warmth.",
-      inclusions: ["Canvas tent accommodation", "Warm bedding", "Bonfire", "Evening barbecue"],
-    },
-  ];
-
-  for (const exp of verifiedExperiences) {
-    experiences.set(exp.id, { ...exp, created_at: new Date().toISOString() });
-    if (exp.id >= nextExperienceId) nextExperienceId = exp.id + 1;
-  }
-
-  // Load Verified Local Guides & Companions
-  const verifiedLocals = [
-    {
-      id: 1,
-      category: "companions",
-      region: "jibhi",
-      name: "Rahul Sharma",
-      location: "Shoja / Jibhi, HP",
-      role: "Local Companion",
-      lang: "Hindi, English, Pahadi",
-      rating: 4.8,
-      reviews: 82,
-      price: "₹500",
-      unit: "/day",
-      tags: ["Village Walks", "Hidden Spots", "River Trails"],
-      image: "/images/locals/rahul.jpg",
-      verified: true,
-      certified: false,
-      gradient: "linear-gradient(135deg,#2b7050,#78caa0)",
-      bio: "Born in Shoja near Jalori Pass, Rahul has guided wanderers through ancient cedar forests and waterfall alcoves for over 7 years.",
-    },
-    {
-      id: 2,
-      category: "companions",
-      region: "tirthan",
-      name: "Sonia Negi",
-      location: "Tirthan Valley, HP",
-      role: "Local Companion",
-      lang: "Hindi, English, Pahadi",
-      rating: 4.9,
-      reviews: 48,
-      price: "₹450",
-      unit: "/day",
-      tags: ["Village Life", "Nature Walks", "Flora & Fauna"],
-      image: "/images/locals/sonia.jpg",
-      verified: true,
-      certified: false,
-      gradient: "linear-gradient(135deg,#8b34a3,#d08be0)",
-      bio: "Sonia loves introducing mindful wanderers to organic farming, trout river walks, and centuries-old Kath-Kuni wooden architecture in Gushaini.",
-    },
-    {
-      id: 3,
-      category: "companions",
-      region: "kullu",
-      name: "Vikram Thakur",
-      location: "Kullu, Himachal Pradesh",
-      role: "Local Companion",
-      lang: "Hindi, English",
-      rating: 4.7,
-      reviews: 36,
-      price: "₹600",
-      unit: "/day",
-      tags: ["Local Culture", "Viewpoints", "Apple Orchards"],
-      image: null,
-      verified: true,
-      certified: false,
-      gradient: "linear-gradient(135deg,#b85d19,#f0a050)",
-      bio: "Native to Kullu valley, Vikram knows every ancient stone temple, apple harvest route, and ridge overlook.",
-    },
-  ];
-
-  for (const loc of verifiedLocals) {
-    locals.set(loc.id, {
-      ...loc,
-      phone: "+91 98160 000" + loc.id,
-      email: loc.name.toLowerCase().replace(/\s+/g, ".") + "@pahadily.in",
-      created_at: new Date().toISOString(),
-    });
-    if (loc.id >= nextLocalId) nextLocalId = loc.id + 1;
+  // Load default categories if none exist
+  if (categories.size === 0) {
+    for (const cat of DEFAULT_ADMIN_CATEGORIES) {
+      categories.set(cat.id, cat);
+    }
   }
 }
 
@@ -891,7 +760,14 @@ async function dispatchEmailNotification(
 // --- Express App Setup ---
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "25mb" }));
+
+// Persistent uploads directory for genuine location photos
+const uploadsDir = path.resolve(__dirname, "public", "uploads", "locations");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+app.use("/uploads", express.static(path.resolve(__dirname, "public", "uploads")));
 
 // Basic IP rate limiting store for auth endpoints
 const authAttemptTracker = new Map<string, { count: number; firstAttempt: number }>();
@@ -971,6 +847,9 @@ app.get("/api/system/storage", (_req, res) => {
     active_storage: activeStorageType,
     database_url_configured: Boolean(process.env.DATABASE_URL),
     persistence_file: activeStorageType === "local_json" ? DB_FILE : null,
+    total_locations: locations.size,
+    published_locations: Array.from(locations.values()).filter((l) => l.status === "published").length,
+    total_categories: categories.size,
     total_places: places.size,
     total_locals: locals.size,
     total_experiences: experiences.size,
@@ -984,6 +863,7 @@ app.get("/api/system/storage", (_req, res) => {
 app.get("/api/stats", (_req, res) => {
   const allBookings = Array.from(bookings.values());
   const allUsers = Array.from(users.values());
+  const publishedLocs = Array.from(locations.values()).filter((l) => l.status === "published");
 
   const parseAmount = (priceStr?: string | null): number => {
     if (!priceStr) return 0;
@@ -1002,9 +882,12 @@ app.get("/api/stats", (_req, res) => {
     .reduce((sum, b) => sum + parseAmount(b.total_price), 0);
 
   res.json({
-    places: places.size,
+    locations: locations.size,
+    published_locations: publishedLocs.length,
+    categories: categories.size,
+    places: publishedLocs.length,
     experiences: experiences.size,
-    locals: locals.size,
+    locals: Array.from(users.values()).filter((u) => ["host", "guide"].includes(u.role)).length,
     bookings: bookings.size,
     users: users.size,
     total_revenue: `₹${totalRev.toLocaleString()}`,
@@ -1134,142 +1017,617 @@ app.post("/api/auth/demo-login", (req, res) => {
   });
 });
 
-// --- Places / Stays Endpoints ---
+// --- Utility Helpers for Location Management ---
+function haversineDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Earth radius in km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c * 10) / 10;
+}
+
+function slugify(text: string): string {
+  return String(text || "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^\w\-]+/g, "")
+    .replace(/\-\-+/g, "-")
+    .replace(/^-+/, "")
+    .replace(/-+$/, "");
+}
+
+// --- Categories Endpoints (Admin Controlled, Public Read) ---
+app.get("/api/categories", (req, res) => {
+  const includeAll = req.query.all === "true" || req.query.include_inactive === "true";
+  let cats = Array.from(categories.values());
+  if (!includeAll) {
+    cats = cats.filter((c) => c.is_active);
+  }
+  res.json(cats);
+});
+
+app.post("/api/categories", authMiddleware(), (req: AuthenticatedRequest, res) => {
+  if (req.user?.role !== "admin") {
+    return res.status(403).json({ detail: "Administrator privileges required to create categories." });
+  }
+  const { name, icon, description, id: customId } = req.body;
+  if (!name || !String(name).trim()) {
+    return res.status(400).json({ detail: "Category name is required." });
+  }
+  const cleanName = String(name).trim();
+  const slug = slugify(customId || cleanName);
+  if (!slug) {
+    return res.status(400).json({ detail: "A valid slug identifier could not be generated." });
+  }
+  if (categories.has(slug)) {
+    return res.status(409).json({ detail: `Category with ID "${slug}" already exists.` });
+  }
+
+  const newCat: LocationCategory = {
+    id: slug,
+    name: cleanName,
+    icon: icon ? String(icon).trim() : "🏔️",
+    description: description ? String(description).trim() : "",
+    is_active: true,
+    created_at: new Date().toISOString(),
+  };
+
+  categories.set(newCat.id, newCat);
+  saveDbState();
+  res.status(201).json(newCat);
+});
+
+app.put("/api/categories/:id", authMiddleware(), (req: AuthenticatedRequest, res) => {
+  if (req.user?.role !== "admin") {
+    return res.status(403).json({ detail: "Administrator privileges required to update categories." });
+  }
+  const catId = String(req.params.id).trim().toLowerCase();
+  const cat = categories.get(catId);
+  if (!cat) {
+    return res.status(404).json({ detail: "Category not found." });
+  }
+
+  const { name, icon, description, is_active } = req.body;
+  if (name !== undefined) {
+    if (!String(name).trim()) return res.status(400).json({ detail: "Category name cannot be empty." });
+    cat.name = String(name).trim();
+  }
+  if (icon !== undefined) cat.icon = String(icon).trim();
+  if (description !== undefined) cat.description = String(description).trim();
+  if (is_active !== undefined) cat.is_active = Boolean(is_active);
+
+  saveDbState();
+  res.json(cat);
+});
+
+app.delete("/api/categories/:id", authMiddleware(), (req: AuthenticatedRequest, res) => {
+  if (req.user?.role !== "admin") {
+    return res.status(403).json({ detail: "Administrator privileges required to delete categories." });
+  }
+  const catId = String(req.params.id).trim().toLowerCase();
+  if (!categories.has(catId)) {
+    return res.status(404).json({ detail: "Category not found." });
+  }
+  const inUse = Array.from(locations.values()).some((l) => l.category === catId);
+  if (inUse) {
+    const cat = categories.get(catId)!;
+    cat.is_active = false;
+    saveDbState();
+    return res.json({ message: "Category is in use by existing locations; it has been deactivated rather than deleted.", deactivated: true });
+  }
+  categories.delete(catId);
+  saveDbState();
+  res.json({ message: "Category deleted successfully." });
+});
+
+// --- Locations Endpoints (Admin Managed Source of Truth, Public Read for Published) ---
+app.get("/api/locations", authMiddleware(true), (req: AuthenticatedRequest, res) => {
+  const { district, valley, category, q, status, with_drafts } = req.query;
+  const user = req.user;
+  const isAdminUser = user?.role === "admin";
+
+  let result = Array.from(locations.values());
+
+  // Non-admins can strictly only see published locations
+  if (!isAdminUser) {
+    result = result.filter((l) => l.status === "published");
+  } else if (status && status !== "all") {
+    result = result.filter((l) => l.status === status);
+  } else if (!with_drafts && !status) {
+    result = result.filter((l) => l.status === "published");
+  }
+
+  if (district && district !== "all") {
+    const dStr = String(district).toLowerCase();
+    result = result.filter((l) => l.district.toLowerCase() === dStr || l.district.toLowerCase().includes(dStr));
+  }
+
+  if (valley && valley !== "all") {
+    const vStr = String(valley).toLowerCase();
+    result = result.filter((l) => l.valley.toLowerCase() === vStr || l.valley.toLowerCase().includes(vStr));
+  }
+
+  if (category && category !== "all") {
+    const cStr = String(category).toLowerCase();
+    result = result.filter((l) => l.category.toLowerCase() === cStr);
+  }
+
+  if (q) {
+    const query = String(q).trim().toLowerCase();
+    result = result.filter(
+      (l) =>
+        l.name.toLowerCase().includes(query) ||
+        l.slug.toLowerCase().includes(query) ||
+        l.district.toLowerCase().includes(query) ||
+        l.valley.toLowerCase().includes(query) ||
+        (l.village && l.village.toLowerCase().includes(query)) ||
+        l.description.toLowerCase().includes(query) ||
+        l.tags.some((t) => t.toLowerCase().includes(query))
+    );
+  }
+
+  res.json(result);
+});
+
+app.get("/api/locations/:idOrSlug", authMiddleware(true), (req: AuthenticatedRequest, res) => {
+  const idOrSlug = String(req.params.idOrSlug).trim();
+  const isNumeric = /^\d+$/.test(idOrSlug);
+  const user = req.user;
+  const isAdminUser = user?.role === "admin";
+
+  let loc: LocationItem | undefined;
+  if (isNumeric) {
+    loc = locations.get(Number(idOrSlug));
+  }
+  if (!loc) {
+    loc = Array.from(locations.values()).find((l) => l.slug.toLowerCase() === idOrSlug.toLowerCase());
+  }
+
+  if (!loc) {
+    return res.status(404).json({ detail: "Location not found." });
+  }
+
+  if (loc.status !== "published" && !isAdminUser) {
+    return res.status(404).json({ detail: "Location not found or not published." });
+  }
+
+  res.json(loc);
+});
+
+app.post("/api/locations", authMiddleware(), (req: AuthenticatedRequest, res) => {
+  if (req.user?.role !== "admin") {
+    return res.status(403).json({ detail: "Administrator privileges required to create locations." });
+  }
+
+  const body = req.body;
+  if (!body.name || !String(body.name).trim()) {
+    return res.status(400).json({ detail: "Location name is required." });
+  }
+  const cleanName = String(body.name).trim();
+  const slug = slugify(body.slug || cleanName);
+  if (!slug) {
+    return res.status(400).json({ detail: "A valid slug identifier could not be generated." });
+  }
+
+  const existingSlug = Array.from(locations.values()).find(
+    (l) => l.slug.toLowerCase() === slug.toLowerCase()
+  );
+  if (existingSlug) {
+    return res.status(409).json({ detail: `A location with the slug "${slug}" already exists.` });
+  }
+
+  // Coordinate validation
+  let lat: number | null = null;
+  if (body.latitude !== undefined && body.latitude !== null && body.latitude !== "") {
+    lat = Number(body.latitude);
+    if (isNaN(lat) || lat < -90 || lat > 90) {
+      return res.status(400).json({ detail: "Latitude must be a valid number between -90 and 90." });
+    }
+  }
+
+  let lon: number | null = null;
+  if (body.longitude !== undefined && body.longitude !== null && body.longitude !== "") {
+    lon = Number(body.longitude);
+    if (isNaN(lon) || lon < -180 || lon > 180) {
+      return res.status(400).json({ detail: "Longitude must be a valid number between -180 and 180." });
+    }
+  }
+
+  const status = ["draft", "published", "archived"].includes(body.status) ? body.status : "draft";
+
+  // Gallery validation & normalization
+  const gallery: LocationImage[] = [];
+  if (Array.isArray(body.gallery)) {
+    for (let i = 0; i < body.gallery.length; i++) {
+      const img = body.gallery[i];
+      if (typeof img === "string" && img.trim()) {
+        gallery.push({ id: `img-${Date.now()}-${i}`, url: img.trim() });
+      } else if (img && typeof img === "object" && img.url) {
+        gallery.push({
+          id: img.id || `img-${Date.now()}-${i}`,
+          url: String(img.url).trim(),
+          caption: img.caption ? String(img.caption).trim() : undefined,
+          credit: img.credit ? String(img.credit).trim() : undefined,
+        });
+      }
+    }
+  }
+
+  const coverImage = body.cover_image
+    ? String(body.cover_image).trim()
+    : gallery.length > 0
+    ? gallery[0].url
+    : "";
+
+  const newLocation: LocationItem = {
+    id: nextLocationId++,
+    name: cleanName,
+    slug,
+    district: String(body.district || "Kullu").trim(),
+    valley: String(body.valley || "Tirthan Valley").trim(),
+    village: body.village ? String(body.village).trim() : undefined,
+    category: String(body.category || "viewpoints").trim(),
+    description: String(body.description || "").trim(),
+    latitude: lat,
+    longitude: lon,
+    cover_image: coverImage,
+    gallery,
+    best_time: body.best_time ? String(body.best_time).trim() : undefined,
+    difficulty: body.difficulty ? String(body.difficulty).trim() : undefined,
+    safety_notes: body.safety_notes ? String(body.safety_notes).trim() : undefined,
+    tags: Array.isArray(body.tags) ? body.tags.map((t: any) => String(t).trim()).filter(Boolean) : [],
+    status,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  locations.set(newLocation.id, newLocation);
+  saveDbState();
+  res.status(201).json(newLocation);
+});
+
+app.put("/api/locations/:id", authMiddleware(), (req: AuthenticatedRequest, res) => {
+  if (req.user?.role !== "admin") {
+    return res.status(403).json({ detail: "Administrator privileges required to update locations." });
+  }
+
+  const id = Number(req.params.id);
+  const loc = locations.get(id);
+  if (!loc) {
+    return res.status(404).json({ detail: "Location not found." });
+  }
+
+  const body = req.body;
+  if (body.name !== undefined) {
+    if (!String(body.name).trim()) return res.status(400).json({ detail: "Location name cannot be empty." });
+    loc.name = String(body.name).trim();
+  }
+
+  if (body.slug !== undefined) {
+    const slug = slugify(body.slug);
+    if (!slug) return res.status(400).json({ detail: "Invalid slug." });
+    const existing = Array.from(locations.values()).find(
+      (l) => l.slug.toLowerCase() === slug.toLowerCase() && l.id !== id
+    );
+    if (existing) {
+      return res.status(409).json({ detail: `Slug "${slug}" is already in use by another location.` });
+    }
+    loc.slug = slug;
+  }
+
+  if (body.district !== undefined) loc.district = String(body.district).trim();
+  if (body.valley !== undefined) loc.valley = String(body.valley).trim();
+  if (body.village !== undefined) loc.village = body.village ? String(body.village).trim() : undefined;
+  if (body.category !== undefined) loc.category = String(body.category).trim();
+  if (body.description !== undefined) loc.description = String(body.description).trim();
+
+  if (body.latitude !== undefined) {
+    if (body.latitude === null || body.latitude === "") {
+      loc.latitude = null;
+    } else {
+      const lat = Number(body.latitude);
+      if (isNaN(lat) || lat < -90 || lat > 90) {
+        return res.status(400).json({ detail: "Latitude must be a valid number between -90 and 90." });
+      }
+      loc.latitude = lat;
+    }
+  }
+
+  if (body.longitude !== undefined) {
+    if (body.longitude === null || body.longitude === "") {
+      loc.longitude = null;
+    } else {
+      const lon = Number(body.longitude);
+      if (isNaN(lon) || lon < -180 || lon > 180) {
+        return res.status(400).json({ detail: "Longitude must be a valid number between -180 and 180." });
+      }
+      loc.longitude = lon;
+    }
+  }
+
+  if (body.cover_image !== undefined) loc.cover_image = String(body.cover_image).trim();
+
+  if (body.gallery !== undefined && Array.isArray(body.gallery)) {
+    loc.gallery = body.gallery.map((img: any, i: number) => {
+      if (typeof img === "string") {
+        return { id: `img-${Date.now()}-${i}`, url: img.trim() };
+      }
+      return {
+        id: img.id || `img-${Date.now()}-${i}`,
+        url: String(img.url || "").trim(),
+        caption: img.caption ? String(img.caption).trim() : undefined,
+        credit: img.credit ? String(img.credit).trim() : undefined,
+      };
+    }).filter((img: LocationImage) => Boolean(img.url));
+  }
+
+  if (body.best_time !== undefined) loc.best_time = body.best_time ? String(body.best_time).trim() : undefined;
+  if (body.difficulty !== undefined) loc.difficulty = body.difficulty ? String(body.difficulty).trim() : undefined;
+  if (body.safety_notes !== undefined) loc.safety_notes = body.safety_notes ? String(body.safety_notes).trim() : undefined;
+  if (body.tags !== undefined && Array.isArray(body.tags)) {
+    loc.tags = body.tags.map((t: any) => String(t).trim()).filter(Boolean);
+  }
+  if (body.status !== undefined && ["draft", "published", "archived"].includes(body.status)) {
+    loc.status = body.status;
+  }
+
+  loc.updated_at = new Date().toISOString();
+  saveDbState();
+  res.json(loc);
+});
+
+app.patch("/api/locations/:id/status", authMiddleware(), (req: AuthenticatedRequest, res) => {
+  if (req.user?.role !== "admin") {
+    return res.status(403).json({ detail: "Administrator privileges required to change location status." });
+  }
+
+  const id = Number(req.params.id);
+  const loc = locations.get(id);
+  if (!loc) {
+    return res.status(404).json({ detail: "Location not found." });
+  }
+
+  const status = req.body.status || req.query.status;
+  if (!["draft", "published", "archived"].includes(status)) {
+    return res.status(400).json({ detail: "Status must be 'draft', 'published', or 'archived'." });
+  }
+
+  loc.status = status;
+  loc.updated_at = new Date().toISOString();
+  saveDbState();
+  res.json(loc);
+});
+
+app.delete("/api/locations/:id", authMiddleware(), (req: AuthenticatedRequest, res) => {
+  if (req.user?.role !== "admin") {
+    return res.status(403).json({ detail: "Administrator privileges required to delete locations." });
+  }
+  const id = Number(req.params.id);
+  if (!locations.has(id)) {
+    return res.status(404).json({ detail: "Location not found." });
+  }
+  locations.delete(id);
+  saveDbState();
+  res.json({ message: "Location deleted successfully." });
+});
+
+// Nearby Locations Endpoint (Strict Haversine, never invents distance)
+app.get("/api/locations/:idOrSlug/nearby", (req, res) => {
+  const idOrSlug = String(req.params.idOrSlug).trim();
+  const isNumeric = /^\d+$/.test(idOrSlug);
+
+  let loc: LocationItem | undefined;
+  if (isNumeric) loc = locations.get(Number(idOrSlug));
+  if (!loc) {
+    loc = Array.from(locations.values()).find((l) => l.slug.toLowerCase() === idOrSlug.toLowerCase());
+  }
+
+  if (!loc) return res.status(404).json({ detail: "Location not found." });
+
+  // If the target location does not have real coordinates, do not fabricate distance!
+  if (loc.latitude == null || loc.longitude == null) {
+    return res.json([]);
+  }
+
+  const targetLat = loc.latitude;
+  const targetLon = loc.longitude;
+  const maxDistanceKm = Number(req.query.max_distance_km) || 60; // 60km search radius
+
+  const nearbyList = Array.from(locations.values())
+    .filter((other) => other.id !== loc!.id && other.status === "published" && other.latitude != null && other.longitude != null)
+    .map((other) => {
+      const distance = haversineDistanceKm(targetLat, targetLon, other.latitude!, other.longitude!);
+      return {
+        location: other,
+        distance_km: distance,
+      };
+    })
+    .filter((item) => item.distance_km <= maxDistanceKm)
+    .sort((a, b) => a.distance_km - b.distance_km)
+    .slice(0, 8);
+
+  res.json(nearbyList);
+});
+
+// Location Companion Discovery (Genuine approved companions for this location/valley)
+app.get("/api/locations/:idOrSlug/companions", (req, res) => {
+  const idOrSlug = String(req.params.idOrSlug).trim();
+  const isNumeric = /^\d+$/.test(idOrSlug);
+
+  let loc: LocationItem | undefined;
+  if (isNumeric) loc = locations.get(Number(idOrSlug));
+  if (!loc) {
+    loc = Array.from(locations.values()).find((l) => l.slug.toLowerCase() === idOrSlug.toLowerCase());
+  }
+
+  if (!loc) return res.status(404).json({ detail: "Location not found." });
+
+  const valleyStr = loc.valley.toLowerCase();
+  const districtStr = loc.district.toLowerCase();
+
+  const matchingCompanions: any[] = [];
+
+  for (const user of users.values()) {
+    if (["guide", "host"].includes(user.role) && user.is_active && user.is_verified) {
+      const appRecord = Array.from(hostApplications.values()).find(
+        (a) => (a.user_id === user.id || a.email?.toLowerCase() === user.email.toLowerCase()) && a.status === "approved"
+      );
+
+      const userRegion = (appRecord?.region || user.bio || "").toLowerCase();
+      const matchesArea =
+        userRegion.includes(valleyStr) ||
+        userRegion.includes(districtStr) ||
+        valleyStr.includes(userRegion) ||
+        !userRegion;
+
+      if (matchesArea) {
+        matchingCompanions.push({
+          id: user.id,
+          name: user.full_name,
+          role: user.role === "guide" ? "Certified Mountain Guide" : "Local Companion",
+          certified: user.role === "guide",
+          verified: user.is_verified,
+          bio: user.bio || appRecord?.bio || "Native local resident ready to share mountain footpaths.",
+          avatar: user.avatar || appRecord?.avatar || null,
+          languages: appRecord?.languages || "Hindi, English, Pahadi",
+          price: appRecord?.price || "₹500",
+          unit: appRecord?.unit || "/day",
+          service_area: appRecord?.region || loc.valley,
+        });
+      }
+    }
+  }
+
+  res.json(matchingCompanions);
+});
+
+// --- Photo Upload Endpoint (Admin Only, Saves to Persistent Local Disk, Returns Public URL) ---
+app.post("/api/upload", authMiddleware(), (req: AuthenticatedRequest, res) => {
+  if (req.user?.role !== "admin") {
+    return res.status(403).json({ detail: "Administrator privileges required to upload media." });
+  }
+  const { data, filename } = req.body;
+  if (!data || !filename) {
+    return res.status(400).json({ detail: "Image data and filename are required." });
+  }
+
+  const ext = path.extname(filename).toLowerCase();
+  const allowed = [".jpg", ".jpeg", ".png", ".webp", ".svg", ".avif"];
+  if (!allowed.includes(ext)) {
+    return res.status(400).json({ detail: "Invalid image format. Allowed formats: JPG, PNG, WebP, SVG, AVIF." });
+  }
+
+  try {
+    const base64Data = data.includes(";base64,") ? data.split(";base64,")[1] : data;
+    const buffer = Buffer.from(base64Data, "base64");
+    if (buffer.length > 10 * 1024 * 1024) {
+      return res.status(400).json({ detail: "Image file exceeds maximum allowed size (10MB)." });
+    }
+
+    const safeBase = slugify(path.basename(filename, ext)) || "photo";
+    const safeName = `${Date.now()}-${safeBase}${ext}`;
+    const targetPath = path.join(uploadsDir, safeName);
+    fs.writeFileSync(targetPath, buffer);
+
+    const publicUrl = `/uploads/locations/${safeName}`;
+    res.status(201).json({
+      url: publicUrl,
+      filename: safeName,
+      size: buffer.length,
+    });
+  } catch (err: any) {
+    res.status(500).json({ detail: `Failed to save image: ${err?.message || "Unknown error"}` });
+  }
+});
+
+// --- Legacy Places Endpoint (Powered by Real Published Locations) ---
 app.get("/api/places", (req, res) => {
   const { region, category, q } = req.query;
-  let result = Array.from(places.values());
+  let result = Array.from(locations.values()).filter((l) => l.status === "published");
 
   if (region && region !== "all") {
     const regStr = String(region).toLowerCase();
-    result = result.filter((p) => p.region.toLowerCase() === regStr);
+    result = result.filter((l) => l.valley.toLowerCase().includes(regStr) || l.district.toLowerCase().includes(regStr));
   }
   if (category && category !== "all") {
     const catStr = String(category).toLowerCase();
-    result = result.filter((p) => p.category.toLowerCase() === catStr);
+    result = result.filter((l) => l.category.toLowerCase() === catStr);
   }
   if (q) {
     const query = String(q).trim().toLowerCase();
     result = result.filter(
-      (p) =>
-        p.name.toLowerCase().includes(query) ||
-        p.tagline.toLowerCase().includes(query) ||
-        p.region.toLowerCase().includes(query) ||
-        p.description.toLowerCase().includes(query) ||
-        p.tags.some((t) => t.toLowerCase().includes(query))
+      (l) =>
+        l.name.toLowerCase().includes(query) ||
+        l.valley.toLowerCase().includes(query) ||
+        l.district.toLowerCase().includes(query) ||
+        l.description.toLowerCase().includes(query)
     );
   }
-  res.json(result);
+
+  const mapped = result.map((l) => ({
+    id: l.id,
+    name: l.name,
+    tagline: l.village ? `${l.village}, ${l.valley}` : l.valley,
+    region: l.valley.toLowerCase().replace(/\s+/g, "-"),
+    district: l.district,
+    category: l.category,
+    price: "₹1,800",
+    unit: "/night",
+    rating: null,
+    reviews: 0,
+    altitude: l.best_time || "Himalayan",
+    tags: l.tags || [],
+    image: l.cover_image || (l.gallery?.[0]?.url ?? ""),
+    description: l.description,
+    latitude: l.latitude,
+    longitude: l.longitude,
+    nearby_locations: [],
+    stay_options: [],
+    created_at: l.created_at,
+  }));
+
+  res.json(mapped);
 });
 
 app.get("/api/places/:id", (req, res) => {
   const id = Number(req.params.id);
+  const loc = locations.get(id);
+  if (loc && loc.status === "published") {
+    return res.json({
+      id: loc.id,
+      name: loc.name,
+      tagline: loc.village ? `${loc.village}, ${loc.valley}` : loc.valley,
+      region: loc.valley.toLowerCase().replace(/\s+/g, "-"),
+      district: loc.district,
+      category: loc.category,
+      price: "₹1,800",
+      unit: "/night",
+      rating: null,
+      reviews: 0,
+      altitude: loc.best_time || "Himalayan",
+      tags: loc.tags || [],
+      image: loc.cover_image || (loc.gallery?.[0]?.url ?? ""),
+      description: loc.description,
+      latitude: loc.latitude,
+      longitude: loc.longitude,
+      nearby_locations: [],
+      stay_options: [],
+      created_at: loc.created_at,
+    });
+  }
   const place = places.get(id);
   if (!place) return res.status(404).json({ detail: "Place not found" });
   res.json(place);
 });
 
-app.post("/api/places", authMiddleware(), (req: AuthenticatedRequest, res) => {
-  if (!req.user || !["admin", "host"].includes(req.user.role)) {
-    return res.status(403).json({ detail: "Admin or Host permissions required to create places." });
-  }
-  const body = req.body;
-  if (!body.name) return res.status(400).json({ detail: "Place name is required" });
-
-  const newPlace: Place = {
-    id: nextPlaceId++,
-    name: body.name,
-    tagline: body.tagline || "",
-    region: String(body.region || "himachal").toLowerCase(),
-    category: String(body.category || "valley").toLowerCase(),
-    price: body.price || "₹2,200",
-    unit: body.unit || "/night",
-    rating: Number(body.rating) || 4.8,
-    reviews: Number(body.reviews) || 12,
-    altitude: body.altitude || "1,800m",
-    tags: Array.isArray(body.tags) ? body.tags : [],
-    image: body.image || "/images/destinations/tirthan-valley.jpg",
-    description: body.description || "",
-    host_name: body.host_name || req.user.full_name || null,
-    latitude: body.latitude ?? null,
-    longitude: body.longitude ?? null,
-    nearby_locations: Array.isArray(body.nearby_locations) ? body.nearby_locations : [],
-    stay_options: Array.isArray(body.stay_options) ? body.stay_options : [],
-    created_at: new Date().toISOString(),
-  };
-  places.set(newPlace.id, newPlace);
-  saveDbState();
-  res.status(201).json(newPlace);
-});
-
-app.put("/api/places/:id", authMiddleware(), (req: AuthenticatedRequest, res) => {
-  if (!req.user || !["admin", "host"].includes(req.user.role)) {
-    return res.status(403).json({ detail: "Admin or Host permissions required." });
-  }
-  const id = Number(req.params.id);
-  const place = places.get(id);
-  if (!place) return res.status(404).json({ detail: "Place not found" });
-
-  const body = req.body;
-  if (body.name) place.name = body.name;
-  if (body.tagline) place.tagline = body.tagline;
-  if (body.region) place.region = String(body.region).toLowerCase();
-  if (body.category) place.category = String(body.category).toLowerCase();
-  if (body.price) place.price = body.price;
-  if (body.unit) place.unit = body.unit;
-  if (body.image) place.image = body.image;
-  if (body.description) place.description = body.description;
-  if (Array.isArray(body.tags)) place.tags = body.tags;
-
-  saveDbState();
-  res.json(place);
-});
-
-app.delete("/api/places/:id", authMiddleware(), (req: AuthenticatedRequest, res) => {
-  if (!req.user || req.user.role !== "admin") {
-    return res.status(403).json({ detail: "Administrator privileges required to delete places." });
-  }
-  const id = Number(req.params.id);
-  if (!places.has(id)) return res.status(404).json({ detail: "Place not found" });
-  places.delete(id);
-  saveDbState();
-  res.json({ message: "Place deleted successfully" });
-});
-
-app.post("/api/places/:id/reviews", (req, res) => {
-  const placeId = Number(req.params.id);
-  const place = places.get(placeId);
-  if (!place) return res.status(404).json({ detail: "Place not found" });
-
-  const { rating, comment, user_name } = req.body;
-  const numRating = Math.max(1, Math.min(5, Number(rating) || 5));
-  const review: PlaceReview = {
-    id: nextReviewId++,
-    place_id: placeId,
-    user_name: user_name || "Himalayan Traveler",
-    rating: numRating,
-    comment: comment || "",
-    created_at: new Date().toISOString(),
-  };
-  placeReviews.set(review.id, review);
-
-  const reviewsForPlace = Array.from(placeReviews.values()).filter((r) => r.place_id === placeId);
-  const total = reviewsForPlace.reduce((sum, r) => sum + r.rating, 0);
-  place.rating = Math.round((total / reviewsForPlace.length) * 10) / 10;
-  place.reviews = reviewsForPlace.length;
-
-  saveDbState();
-  res.json(place);
-});
-
-app.get("/api/places/:id/reviews", (req, res) => {
-  const placeId = Number(req.params.id);
-  const reviews = Array.from(placeReviews.values())
-    .filter((r) => r.place_id === placeId)
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  res.json(reviews);
-});
-
-// --- Experiences Endpoints ---
+// --- Experiences Endpoints (Real Experiences Only) ---
 app.get("/api/experiences", (req, res) => {
   const { region, category, q } = req.query;
   let result = Array.from(experiences.values());
@@ -1300,32 +1658,80 @@ app.get("/api/experiences/:id", (req, res) => {
   res.json(exp);
 });
 
-// --- Locals / Native Companions Endpoints ---
+// --- Locals / Native Companions Endpoints (Real Approved Profiles Only) ---
 app.get("/api/locals", (req, res) => {
   const { category, region, q } = req.query;
-  let result = Array.from(locals.values());
+  const realLocals: any[] = [];
 
-  if (category && category !== "all") {
-    result = result.filter((l) => l.category.toLowerCase() === String(category).toLowerCase());
+  for (const user of users.values()) {
+    if (["guide", "host"].includes(user.role) && user.is_active && user.is_verified) {
+      const appRecord = Array.from(hostApplications.values()).find(
+        (a) => (a.user_id === user.id || a.email?.toLowerCase() === user.email.toLowerCase()) && a.status === "approved"
+      );
+
+      const reg = (appRecord?.region || "Kullu").toLowerCase();
+      const roleName = user.role === "guide" ? "Certified Mountain Guide" : "Local Companion";
+      const cat = user.role === "guide" ? "trek-guides" : "companions";
+
+      if (category && category !== "all" && cat !== category) continue;
+      if (region && region !== "all" && !reg.includes(String(region).toLowerCase())) continue;
+
+      if (q) {
+        const query = String(q).trim().toLowerCase();
+        if (!user.full_name.toLowerCase().includes(query) && !reg.includes(query)) continue;
+      }
+
+      realLocals.push({
+        id: user.id,
+        category: cat,
+        region: reg,
+        name: user.full_name,
+        location: `${reg.charAt(0).toUpperCase() + reg.slice(1)}, Himachal Pradesh`,
+        role: roleName,
+        lang: appRecord?.languages || "Hindi, English, Pahadi",
+        rating: null,
+        reviews: 0,
+        price: appRecord?.price || "₹500",
+        unit: appRecord?.unit || "/day",
+        tags: ["Verified Local", user.role === "guide" ? "High Alpine Escort" : "Village Walks"],
+        image: user.avatar || appRecord?.avatar || null,
+        verified: user.is_verified,
+        certified: user.role === "guide",
+        bio: user.bio || appRecord?.bio || "Native local resident ready to share authentic mountain trails.",
+      });
+    }
   }
-  if (region && region !== "all") {
-    result = result.filter((l) => l.region.toLowerCase() === String(region).toLowerCase());
-  }
-  if (q) {
-    const query = String(q).trim().toLowerCase();
-    result = result.filter(
-      (l) =>
-        l.name.toLowerCase().includes(query) ||
-        l.location.toLowerCase().includes(query) ||
-        l.role.toLowerCase().includes(query) ||
-        l.tags.some((t) => t.toLowerCase().includes(query))
-    );
-  }
-  res.json(result);
+
+  res.json(realLocals);
 });
 
 app.get("/api/locals/:id", (req, res) => {
   const id = Number(req.params.id);
+  const user = users.get(id);
+  if (user && ["guide", "host"].includes(user.role) && user.is_active && user.is_verified) {
+    const appRecord = Array.from(hostApplications.values()).find(
+      (a) => (a.user_id === user.id || a.email?.toLowerCase() === user.email.toLowerCase()) && a.status === "approved"
+    );
+    const reg = (appRecord?.region || "Kullu").toLowerCase();
+    return res.json({
+      id: user.id,
+      category: user.role === "guide" ? "trek-guides" : "companions",
+      region: reg,
+      name: user.full_name,
+      location: `${reg.charAt(0).toUpperCase() + reg.slice(1)}, Himachal Pradesh`,
+      role: user.role === "guide" ? "Certified Mountain Guide" : "Local Companion",
+      lang: appRecord?.languages || "Hindi, English, Pahadi",
+      rating: null,
+      reviews: 0,
+      price: appRecord?.price || "₹500",
+      unit: appRecord?.unit || "/day",
+      tags: ["Verified Local", user.role === "guide" ? "High Alpine Escort" : "Village Walks"],
+      image: user.avatar || appRecord?.avatar || null,
+      verified: user.is_verified,
+      certified: user.role === "guide",
+      bio: user.bio || appRecord?.bio || "Native local resident ready to share authentic mountain trails.",
+    });
+  }
   const local = locals.get(id);
   if (!local) return res.status(404).json({ detail: "Local companion not found" });
   res.json(local);
@@ -1336,7 +1742,7 @@ app.get("/api/locals/:id/busy-dates", (req, res) => {
   const busySlots: Array<{ date: string; time_slot: string }> = [];
 
   for (const b of bookings.values()) {
-    if (b.status === "confirmed" && b.item_id === id) {
+    if (b.status === "confirmed" && (b.item_id === id || b.provider_id === id)) {
       busySlots.push({
         date: b.travel_date,
         time_slot: b.time_slot || "full_day",

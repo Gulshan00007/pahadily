@@ -1,78 +1,50 @@
-import { useState, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { EXPLORE_DESTINATIONS } from '../data/exploreDestinationsData';
+import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { getLocations } from '../lib/api';
 
 export default function StaysPage() {
   const [searchParams] = useSearchParams();
-  const { openBooking } = useAuth();
+  const { openBooking, openHostApplication, refreshKey } = useAuth();
 
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
   const [selectedValley, setSelectedValley] = useState(searchParams.get('valley') || 'all');
-  const [selectedAmenity, setSelectedAmenity] = useState('all');
+  const [staysList, setStaysList] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Flatten all stays from all destinations with destination metadata
-  const allStays = useMemo(() => {
-    const list = [];
-    for (const dest of EXPLORE_DESTINATIONS) {
-      if (dest.stays && dest.stays.length > 0) {
-        for (const s of dest.stays) {
-          list.push({
-            ...s,
-            destinationId: dest.id,
-            destinationName: dest.name,
-            valleyName: dest.subValley || dest.name,
-            state: dest.state,
-          });
-        }
-      }
-    }
-    return list;
-  }, []);
-
-  const valleyFilters = [
-    { id: 'all', label: 'All Valleys' },
-    { id: 'tirthan', label: 'Tirthan Valley' },
-    { id: 'jibhi', label: 'Jibhi & Banjar' },
-    { id: 'shangarh', label: 'Shangarh & Sainj' },
-    { id: 'naggar', label: 'Naggar & Upper Beas' },
-    { id: 'lug-valley', label: 'Lug Valley' },
-    { id: 'kalga', label: 'Parvati Valley' },
-  ];
-
-  const amenityFilters = [
-    { id: 'all', label: 'All Amenities' },
-    { id: 'Meals', label: '🍲 Home-Cooked Meals' },
-    { id: 'River View', label: '🌊 River View' },
-    { id: 'WiFi', label: '📶 High-Speed WiFi' },
-    { id: 'Fireplace', label: '🪵 Traditional Hearth' },
-  ];
+  useEffect(() => {
+    setLoading(true);
+    // Stays are genuine locations or approved homestays
+    getLocations({ status: 'published' })
+      .then((data) => {
+        const publishedStays = (Array.isArray(data) ? data : []).filter(
+          (loc) => loc.category === 'villages' || loc.category === 'homestays' || (loc.tags && loc.tags.some((t) => t.toLowerCase().includes('stay') || t.toLowerCase().includes('homestay')))
+        );
+        setStaysList(publishedStays);
+      })
+      .catch((err) => {
+        console.warn('Could not load stays:', err);
+        setStaysList([]);
+      })
+      .finally(() => setLoading(false));
+  }, [refreshKey]);
 
   const filteredStays = useMemo(() => {
-    return allStays.filter((stay) => {
-      // Valley filter
+    return staysList.filter((stay) => {
       if (selectedValley !== 'all') {
-        if (stay.destinationId !== selectedValley) return false;
+        const v = String(stay.valley || '').toLowerCase();
+        if (!v.includes(selectedValley.toLowerCase())) return false;
       }
-
-      // Amenity filter
-      if (selectedAmenity !== 'all') {
-        if (!stay.amenities || !stay.amenities.includes(selectedAmenity)) return false;
-      }
-
-      // Query filter
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
         const matchesName = stay.name.toLowerCase().includes(q);
         const matchesDesc = stay.description?.toLowerCase().includes(q);
-        const matchesLoc = stay.subLocation?.toLowerCase().includes(q);
-        const matchesHost = stay.host?.toLowerCase().includes(q);
-        if (!matchesName && !matchesDesc && !matchesLoc && !matchesHost) return false;
+        const matchesLoc = stay.village?.toLowerCase().includes(q) || stay.valley?.toLowerCase().includes(q);
+        if (!matchesName && !matchesDesc && !matchesLoc) return false;
       }
-
       return true;
     });
-  }, [allStays, selectedValley, selectedAmenity, searchQuery]);
+  }, [staysList, selectedValley, searchQuery]);
 
   return (
     <div style={{ backgroundColor: '#F7F5EE', minHeight: 'calc(100vh - 76px)', paddingBottom: '80px' }}>
@@ -98,376 +70,242 @@ export default function StaysPage() {
                 marginBottom: '8px',
               }}
             >
-              Living Vernacular Heritage
+              Verified Village Homestays
             </span>
             <h1
               style={{
                 fontFamily: "'Playfair Display', Georgia, serif",
-                fontSize: 'clamp(28px, 6vw, 38px)',
+                fontSize: '36px',
                 color: '#FFFFFF',
-                margin: '0 0 16px 0',
-                lineHeight: 1.15,
+                margin: '0 0 12px 0',
+                lineHeight: 1.2,
               }}
             >
-              Authentic Himalayan Homestays
+              Himalayan Architectural Stays
             </h1>
-            <p
-              style={{
-                fontSize: '16px',
-                lineHeight: 1.6,
-                color: 'rgba(247, 245, 238, 0.85)',
-                margin: 0,
-              }}
-            >
-              Handcrafted Kath-Kuni chalets, organic apple orchard farmhouses, and riverside mud cottages hosted by multi-generational Himachali families. Enjoy wood-fired meals, fresh mountain cow milk, and peaceful starry nights.
+            <p style={{ fontSize: '15px', color: 'rgba(247, 245, 238, 0.85)', lineHeight: 1.6, margin: 0 }}>
+              Stay inside authentic Kath-Kuni homes and indigenous apple orchard cottages with verified host families. No commercial hotels or fabricated listings.
             </p>
           </div>
         </div>
       </section>
 
-      {/* Filter Toolbar */}
-      <section
-        style={{
-          backgroundColor: '#FFFFFF',
-          borderBottom: '1px solid rgba(16, 37, 29, 0.08)',
-          padding: '20px 0',
-          position: 'sticky',
-          top: '76px',
-          zIndex: 40,
-          boxShadow: '0 2px 8px rgba(16, 37, 29, 0.03)',
-        }}
-      >
-        <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 24px' }}>
-          {/* Top Row: Search & Amenity */}
-          <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '16px',
-              marginBottom: '16px',
-            }}
-          >
-            {/* Search */}
-            <div
+      {/* Main Container */}
+      <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '40px 24px 0 24px' }}>
+        {/* Search & Filter Bar */}
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <select
+              value={selectedValley}
+              onChange={(e) => setSelectedValley(e.target.value)}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                backgroundColor: '#F7F5EE',
-                border: '1px solid rgba(16, 37, 29, 0.15)',
+                padding: '8px 16px',
                 borderRadius: '9999px',
-                padding: '6px 14px',
-                width: '100%',
-                maxWidth: '380px',
-              }}
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#174D39" strokeWidth="2.2">
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-              <input
-                type="text"
-                placeholder="Search homestays, host, village..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{
-                  border: 'none',
-                  background: 'transparent',
-                  padding: '6px 10px',
-                  fontSize: '13.5px',
-                  color: '#10251D',
-                  outline: 'none',
-                  width: '100%',
-                }}
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#536B5E' }}
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-
-            {/* Amenity Filter */}
-            <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', scrollbarWidth: 'none' }}>
-              {amenityFilters.map((af) => {
-                const active = selectedAmenity === af.id;
-                return (
-                  <button
-                    key={af.id}
-                    type="button"
-                    onClick={() => setSelectedAmenity(af.id)}
-                    style={{
-                      padding: '5px 14px',
-                      borderRadius: '9999px',
-                      fontSize: '12px',
-                      fontWeight: active ? 700 : 500,
-                      backgroundColor: active ? 'rgba(23, 77, 57, 0.15)' : 'transparent',
-                      color: active ? '#174D39' : '#536B5E',
-                      border: active ? '1px solid #174D39' : '1px solid rgba(16, 37, 29, 0.12)',
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {af.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Valley Filter Pills */}
-          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', scrollbarWidth: 'none' }}>
-            {valleyFilters.map((vf) => {
-              const active = selectedValley === vf.id;
-              return (
-                <button
-                  key={vf.id}
-                  type="button"
-                  onClick={() => setSelectedValley(vf.id)}
-                  style={{
-                    padding: '6px 16px',
-                    borderRadius: '9999px',
-                    fontSize: '12.5px',
-                    fontWeight: active ? 700 : 500,
-                    backgroundColor: active ? '#174D39' : 'transparent',
-                    color: active ? '#FFFFFF' : '#10251D',
-                    border: active ? '1px solid #174D39' : '1px solid rgba(16, 37, 29, 0.12)',
-                    whiteSpace: 'nowrap',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  {vf.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* Main Grid */}
-      <div style={{ maxWidth: '1280px', margin: '36px auto 0 auto', padding: '0 clamp(14px, 3vw, 24px)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <div style={{ fontSize: '15px', color: '#536B5E', fontWeight: 600 }}>
-            Showing <strong>{filteredStays.length}</strong> Family Homestays
-          </div>
-          {(selectedValley !== 'all' || selectedAmenity !== 'all' || searchQuery) && (
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedValley('all');
-                setSelectedAmenity('all');
-                setSearchQuery('');
-              }}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#174D39',
-                fontSize: '13px',
-                fontWeight: 600,
+                border: '1px solid rgba(16, 37, 29, 0.15)',
+                backgroundColor: '#FFFFFF',
+                fontSize: '13.5px',
+                color: '#10251D',
+                outline: 'none',
                 cursor: 'pointer',
               }}
             >
-              Reset Filters ✕
-            </button>
-          )}
-        </div>
+              <option value="all">All Valleys</option>
+              <option value="tirthan">Tirthan Valley</option>
+              <option value="jibhi">Jibhi / Banjar</option>
+              <option value="parvati">Parvati Valley</option>
+              <option value="spiti">Spiti Valley</option>
+              <option value="kullu">Kullu</option>
+            </select>
 
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))',
-            gap: '24px',
-          }}
-        >
-          {filteredStays.map((stay) => (
-            <article
-              key={stay.id}
+            <input
+              type="text"
+              placeholder="Search stays by name, village, valley..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               style={{
-                backgroundColor: 'var(--color-bg-surface-elevated, #FFFFFF)',
-                borderRadius: '14px',
-                overflow: 'hidden',
-                border: '1px solid rgba(10, 37, 27, 0.08)',
-                boxShadow: '0 2px 8px rgba(10, 37, 27, 0.04)',
-                display: 'flex',
-                flexDirection: 'column',
-                transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+                padding: '8px 16px',
+                borderRadius: '9999px',
+                border: '1px solid rgba(16, 37, 29, 0.15)',
+                backgroundColor: '#FFFFFF',
+                fontSize: '13.5px',
+                width: '280px',
+                outline: 'none',
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(101, 184, 142, 0.45)';
-                e.currentTarget.style.boxShadow = '0 6px 18px rgba(10, 37, 27, 0.08)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(10, 37, 27, 0.08)';
-                e.currentTarget.style.boxShadow = '0 2px 8px rgba(10, 37, 27, 0.04)';
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={openHostApplication}
+            style={{
+              padding: '8px 18px',
+              borderRadius: '9999px',
+              backgroundColor: '#174D39',
+              color: '#FFFFFF',
+              fontSize: '13px',
+              fontWeight: 600,
+              border: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            Apply to Host a Stay +
+          </button>
+        </div>
+        {/* Loading state */}
+        {loading && (
+          <div style={{ textAlign: 'center', padding: '60px 0', color: '#536B5E' }}>
+            <div style={{ fontSize: '32px', marginBottom: '12px' }}>🪵</div>
+            <p style={{ fontSize: '15px' }}>Loading verified homestays...</p>
+          </div>
+        )}
+
+        {/* Honest Empty State */}
+        {!loading && filteredStays.length === 0 && (
+          <div
+            style={{
+              maxWidth: '640px',
+              margin: '20px auto 60px auto',
+              textAlign: 'center',
+              backgroundColor: '#FFFFFF',
+              borderRadius: '20px',
+              padding: '48px 32px',
+              border: '1px solid rgba(16, 37, 29, 0.08)',
+              boxShadow: '0 4px 20px rgba(16, 37, 29, 0.04)',
+            }}
+          >
+            <div style={{ fontSize: '42px', marginBottom: '16px' }}>🪵</div>
+            <h2
+              style={{
+                fontFamily: "'Playfair Display', Georgia, serif",
+                fontSize: '24px',
+                color: '#10251D',
+                marginBottom: '10px',
               }}
             >
-              {/* Image banner */}
-              <div style={{ position: 'relative', height: '230px', overflow: 'hidden' }}>
-                <img
-                  src={stay.images?.[0] || 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80'}
-                  alt={stay.name}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  loading="lazy"
-                />
-                <span
-                  style={{
-                    position: 'absolute',
-                    top: '12px',
-                    left: '12px',
-                    backgroundColor: 'rgba(23, 77, 57, 0.85)',
-                    backdropFilter: 'blur(4px)',
-                    color: '#8EE49A',
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    padding: '4px 10px',
-                    borderRadius: '9999px',
-                  }}
-                >
-                  📍 {stay.subLocation || stay.valleyName}
-                </span>
+              No stays have been listed here yet.
+            </h2>
+            <p style={{ fontSize: '14.5px', color: '#536B5E', lineHeight: 1.6, marginBottom: '24px' }}>
+              We do not populate fake homestays or sample rooms. If you own a traditional Kath-Kuni house or village home in Himachal Pradesh, submit an application to join our verified community.
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={openHostApplication}
+                style={{
+                  padding: '11px 24px',
+                  borderRadius: '9999px',
+                  backgroundColor: '#174D39',
+                  color: '#FFFFFF',
+                  fontSize: '13.5px',
+                  fontWeight: 600,
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                Apply to Become a Local Host
+              </button>
+              <Link
+                to="/explore"
+                style={{
+                  padding: '11px 24px',
+                  borderRadius: '9999px',
+                  backgroundColor: 'rgba(23, 77, 57, 0.08)',
+                  color: '#174D39',
+                  border: '1px solid rgba(23, 77, 57, 0.2)',
+                  fontSize: '13.5px',
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                }}
+              >
+                Explore Valid Destinations
+              </Link>
+            </div>
+          </div>
+        )}
 
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '12px',
-                    right: '12px',
-                    backgroundColor: 'rgba(247, 245, 238, 0.95)',
-                    color: '#10251D',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    padding: '3px 9px',
-                    borderRadius: '9999px',
-                  }}
-                >
-                  ★ {stay.rating} ({stay.reviewsCount})
-                </div>
-              </div>
-
-              {/* Body */}
-              <div style={{ padding: '24px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                <div style={{ fontSize: '12px', color: '#174D39', fontWeight: 600, marginBottom: '4px' }}>
-                  Hosted by {stay.host}
-                </div>
-
-                <h3
-                  style={{
-                    fontFamily: "'Playfair Display', Georgia, serif",
-                    fontSize: '21px',
-                    color: '#10251D',
-                    margin: '0 0 8px 0',
-                    lineHeight: 1.25,
-                    fontWeight: 700,
-                  }}
-                >
-                  {stay.name}
-                </h3>
-
-                <p
-                  style={{
-                    fontSize: '13px',
-                    lineHeight: 1.5,
-                    color: '#536B5E',
-                    margin: '0 0 16px 0',
-                    flex: 1,
-                  }}
-                >
-                  {stay.description || stay.tagline}
-                </p>
-
-                {/* Amenities pills */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '20px' }}>
-                  {stay.amenities?.map((amenity, i) => (
-                    <span
-                      key={i}
-                      style={{
-                        fontSize: '11px',
-                        backgroundColor: '#F7F5EE',
-                        border: '1px solid rgba(16, 37, 29, 0.08)',
-                        color: '#174D39',
-                        padding: '3px 8px',
-                        borderRadius: '6px',
-                        fontWeight: 600,
-                      }}
-                    >
-                      {amenity}
-                    </span>
-                  ))}
-                </div>
-
-                {/* Room options breakdown if present */}
-                {stay.stayOptions && stay.stayOptions.length > 0 && (
+        {/* Real Stays Grid */}
+        {!loading && filteredStays.length > 0 && (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+              gap: '24px',
+            }}
+          >
+            {filteredStays.map((stay) => (
+              <div
+                key={stay.id}
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: '16px',
+                  overflow: 'hidden',
+                  border: '1px solid rgba(16, 37, 29, 0.08)',
+                  boxShadow: '0 2px 10px rgba(16, 37, 29, 0.04)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
+              >
+                <div style={{ position: 'relative', height: '220px', backgroundColor: '#EBE7DE' }}>
+                  {stay.cover_image ? (
+                    <img src={stay.cover_image} alt={stay.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#88988E' }}>
+                      🪵 Verified Village Stay
+                    </div>
+                  )}
                   <div
                     style={{
-                      backgroundColor: '#FAF8F2',
-                      borderRadius: '10px',
-                      padding: '10px 12px',
-                      marginBottom: '18px',
-                      fontSize: '12px',
-                      color: '#1e362c',
+                      position: 'absolute',
+                      top: '12px',
+                      left: '12px',
+                      backgroundColor: 'rgba(10, 37, 27, 0.8)',
+                      color: '#8EE49A',
+                      padding: '4px 10px',
+                      borderRadius: '9999px',
+                      fontSize: '11px',
+                      fontWeight: 700,
                     }}
                   >
-                    <div style={{ fontWeight: 700, color: '#10251D', marginBottom: '4px' }}>
-                      Room Options:
-                    </div>
-                    {stay.stayOptions.map((opt) => (
-                      <div key={opt.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
-                        <span>{opt.name} ({opt.capacity})</span>
-                        <strong style={{ color: '#174D39' }}>{opt.price}</strong>
-                      </div>
-                    ))}
+                    {stay.valley || stay.district}
                   </div>
-                )}
+                </div>
 
-                {/* Price & CTA */}
-                <div
-                  style={{
-                    borderTop: '1px solid rgba(16, 37, 29, 0.08)',
-                    paddingTop: '16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginTop: 'auto',
-                  }}
-                >
-                  <div>
-                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#174D39', lineHeight: 1 }}>
-                      {stay.price}
+                <div style={{ padding: '22px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  <h3 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: '20px', color: '#10251D', margin: '0 0 6px 0' }}>
+                    {stay.name}
+                  </h3>
+                  <p style={{ color: '#536B5E', fontSize: '13.5px', lineHeight: 1.55, margin: '0 0 16px 0', flex: 1 }}>
+                    {stay.description}
+                  </p>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', borderTop: '1px solid rgba(16, 37, 29, 0.08)' }}>
+                    <div>
+                      <span style={{ fontSize: '12.5px', color: '#688575', fontWeight: 600 }}>
+                        {stay.village ? `${stay.village}, ${stay.district}` : stay.district}
+                      </span>
                     </div>
-                    <div style={{ fontSize: '11px', color: '#536B5E' }}>
-                      {stay.unit || '/ night'}
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => openBooking(stay, 'stay')}
+                      style={{
+                        padding: '8px 18px',
+                        borderRadius: '9999px',
+                        backgroundColor: '#174D39',
+                        color: '#FFFFFF',
+                        fontSize: '12.5px',
+                        fontWeight: 700,
+                        border: 'none',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Request Stay
+                    </button>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => openBooking(stay, 'stay')}
-                    style={{
-                      padding: '9px 18px',
-                      borderRadius: '8px',
-                      backgroundColor: 'var(--color-forest-light, #205540)',
-                      color: '#FFFFFF',
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      border: 'none',
-                      cursor: 'pointer',
-                      transition: 'background-color 0.15s ease',
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-forest-dark, #0A251B)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-forest-light, #205540)')}
-                  >
-                    Request Stay →
-                  </button>
                 </div>
               </div>
-            </article>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

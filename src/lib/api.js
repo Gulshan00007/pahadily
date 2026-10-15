@@ -440,6 +440,148 @@ export async function deleteHostApplication(id) {
   return data;
 }
 
+// --- Categories (Admin Controlled, Public Read) ---
+
+export async function getCategories(params = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.all) searchParams.set("all", "true");
+  if (params.include_inactive) searchParams.set("include_inactive", "true");
+  const query = searchParams.toString();
+  const response = await fetch(`${API_BASE_URL}/api/categories${query ? `?${query}` : ""}`);
+  if (!response.ok) throw new Error("Could not fetch categories");
+  return response.json();
+}
+
+export async function createCategory(payload) {
+  const response = await fetch(`${API_BASE_URL}/api/categories`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || "Failed to create category");
+  return data;
+}
+
+export async function updateCategory(id, payload) {
+  const response = await fetch(`${API_BASE_URL}/api/categories/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || "Failed to update category");
+  return data;
+}
+
+export async function deleteCategory(id) {
+  const response = await fetch(`${API_BASE_URL}/api/categories/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || "Failed to delete category");
+  return data;
+}
+
+// --- Locations (Admin Managed Source of Truth) ---
+
+export async function getLocations(params = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.district && params.district !== "all") searchParams.set("district", params.district);
+  if (params.valley && params.valley !== "all") searchParams.set("valley", params.valley);
+  if (params.category && params.category !== "all") searchParams.set("category", params.category);
+  if (params.status && params.status !== "all") searchParams.set("status", params.status);
+  if (params.with_drafts) searchParams.set("with_drafts", "true");
+  if (params.q?.trim()) searchParams.set("q", params.q.trim());
+
+  const query = searchParams.toString();
+  const response = await fetch(`${API_BASE_URL}/api/locations${query ? `?${query}` : ""}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) throw new Error(`Locations request failed: ${response.status}`);
+  return response.json();
+}
+
+export async function getLocation(idOrSlug) {
+  const response = await fetch(`${API_BASE_URL}/api/locations/${encodeURIComponent(idOrSlug)}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) throw new Error("Location not found");
+  return response.json();
+}
+
+export async function createLocation(payload) {
+  const response = await fetch(`${API_BASE_URL}/api/locations`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || "Failed to create location");
+  return data;
+}
+
+export async function updateLocation(id, payload) {
+  const response = await fetch(`${API_BASE_URL}/api/locations/${id}`, {
+    method: "PUT",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || "Failed to update location");
+  return data;
+}
+
+export async function updateLocationStatus(id, status) {
+  const response = await fetch(`${API_BASE_URL}/api/locations/${id}/status`, {
+    method: "PATCH",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ status }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || "Failed to update location status");
+  return data;
+}
+
+export async function deleteLocation(id) {
+  const response = await fetch(`${API_BASE_URL}/api/locations/${id}`, {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || "Failed to delete location");
+  return data;
+}
+
+export async function getLocationNearby(idOrSlug, maxDistanceKm = 60) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/locations/${encodeURIComponent(idOrSlug)}/nearby?max_distance_km=${maxDistanceKm}`
+  );
+  if (!response.ok) return [];
+  return response.json();
+}
+
+export async function getLocationCompanions(idOrSlug) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/locations/${encodeURIComponent(idOrSlug)}/companions`
+  );
+  if (!response.ok) return [];
+  return response.json();
+}
+
+// --- Media Upload (Admin Only) ---
+export async function uploadPhoto({ data, filename }) {
+  const response = await fetch(`${API_BASE_URL}/api/upload`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ data, filename }),
+  });
+  const resData = await response.json();
+  if (!response.ok) throw new Error(resData.detail || "Failed to upload photo");
+  return resData;
+}
+
 // Aliases for clear component ergonomics
 export const getBusyDates = getProviderBusyDates;
 export const getProviderRequests = getProviderBookings;

@@ -177,11 +177,6 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link to="/stories" style={{ color: 'inherit', textDecoration: 'none' }}>
-                  Himalayan Stories & Journal
-                </Link>
-              </li>
-              <li>
                 <Link to="/become-a-local" style={{ color: '#8EE49A', fontWeight: 600, textDecoration: 'none' }}>
                   Become a Local Host / Guide ↗
                 </Link>

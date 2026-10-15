@@ -1,42 +1,49 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { VERIFIED_LOCALS } from '../data/localsData';
 import { useAuth } from '../context/AuthContext';
+import { getLocals } from '../lib/api';
 
 export default function CompanionsPage() {
   const [searchParams] = useSearchParams();
-  const { openBooking, openHostApplication } = useAuth();
+  const { openBooking, openHostApplication, refreshKey } = useAuth();
 
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
-  const [selectedRole, setSelectedRole] = useState('all'); // 'all' | 'companions' | 'trek-guides' | 'food-hosts'
+  const [selectedRole, setSelectedRole] = useState('all'); // 'all' | 'companions' | 'trek-guides'
   const [selectedValley, setSelectedValley] = useState(searchParams.get('valley') || 'all');
+  const [localsList, setLocalsList] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    getLocals()
+      .then((data) => {
+        setLocalsList(Array.isArray(data) ? data : []);
+      })
+      .catch((err) => {
+        console.warn('Could not load companions:', err);
+        setLocalsList([]);
+      })
+      .finally(() => setLoading(false));
+  }, [refreshKey]);
 
   const roleFilters = [
-    { id: 'all', label: 'All Local Guides & Hosts' },
-    { id: 'companions', label: '🤝 Local Companions' },
+    { id: 'all', label: 'All Verified Guides & Hosts' },
+    { id: 'companions', label: '🤝 Native Local Companions' },
     { id: 'trek-guides', label: '🥾 Certified Trek Guides' },
-    { id: 'food-hosts', label: '🍲 Food & Farm Hosts' },
-  ];
-
-  const valleyFilters = [
-    { id: 'all', label: 'All Valleys' },
-    { id: 'jibhi', label: 'Jibhi & Banjar' },
-    { id: 'tirthan', label: 'Tirthan Valley' },
-    { id: 'kullu', label: 'Kullu & Naggar' },
-    { id: 'shangarh', label: 'Shangarh & Sainj' },
-    { id: 'kasol', label: 'Parvati Valley' },
   ];
 
   const filteredLocals = useMemo(() => {
-    return VERIFIED_LOCALS.filter((loc) => {
+    return localsList.filter((loc) => {
       // Role filter
       if (selectedRole !== 'all') {
-        if (loc.category !== selectedRole) return false;
+        if (selectedRole === 'trek-guides' && !loc.certified) return false;
+        if (selectedRole === 'companions' && loc.certified) return false;
       }
 
       // Valley filter
       if (selectedValley !== 'all') {
-        if (loc.region !== selectedValley) return false;
+        const reg = String(loc.region || loc.location || '').toLowerCase();
+        if (!reg.includes(selectedValley.toLowerCase())) return false;
       }
 
       // Search query
@@ -51,7 +58,7 @@ export default function CompanionsPage() {
 
       return true;
     });
-  }, [selectedRole, selectedValley, searchQuery]);
+  }, [localsList, selectedRole, selectedValley, searchQuery]);
 
   return (
     <div style={{ backgroundColor: '#F7F5EE', minHeight: 'calc(100vh - 76px)', paddingBottom: '80px' }}>
@@ -77,391 +84,285 @@ export default function CompanionsPage() {
                 marginBottom: '8px',
               }}
             >
-              Native Himalayan Mountain Guides
+              Certified Safeguards • Native Companions
             </span>
             <h1
               style={{
                 fontFamily: "'Playfair Display', Georgia, serif",
-                fontSize: 'clamp(28px, 6vw, 38px)',
+                fontSize: '36px',
                 color: '#FFFFFF',
-                margin: '0 0 16px 0',
-                lineHeight: 1.15,
+                margin: '0 0 12px 0',
+                lineHeight: 1.2,
               }}
             >
-              Himalayan Local Companions
+              Verified Himalayan Local Companions
             </h1>
-            <p
-              style={{
-                fontSize: '16px',
-                lineHeight: 1.6,
-                color: 'rgba(247, 245, 238, 0.85)',
-                margin: '0 0 24px 0',
-              }}
-            >
-              Travel with people who grew up along these cedar ridges. Fixed, fair daily honorariums go directly to native companions with zero middleman commissions.
+            <p style={{ fontSize: '15px', color: 'rgba(247, 245, 238, 0.85)', lineHeight: 1.6, margin: 0 }}>
+              Connect with native residents and mountaineering-certified guides. Every companion shown here has undergone administrative verification of identity and credentials.
             </p>
-
-            <button
-              type="button"
-              onClick={openHostApplication}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '9px 18px',
-                borderRadius: '9999px',
-                backgroundColor: 'rgba(142, 228, 154, 0.15)',
-                border: '1px solid #8EE49A',
-                color: '#8EE49A',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              <span>🌲 Are you a Himachal local? Join our verified network →</span>
-            </button>
           </div>
         </div>
       </section>
 
-      {/* Filter Strip */}
-      <section
-        style={{
-          backgroundColor: '#FFFFFF',
-          borderBottom: '1px solid rgba(16, 37, 29, 0.08)',
-          padding: '20px 0',
-          position: 'sticky',
-          top: '76px',
-          zIndex: 40,
-          boxShadow: '0 2px 8px rgba(16, 37, 29, 0.03)',
-        }}
-      >
-        <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 24px' }}>
-          {/* Top Row: Search & Valley Filter */}
-          <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '16px',
-              marginBottom: '16px',
-            }}
-          >
-            {/* Search input */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                backgroundColor: '#F7F5EE',
-                border: '1px solid rgba(16, 37, 29, 0.15)',
-                borderRadius: '9999px',
-                padding: '6px 14px',
-                width: '100%',
-                maxWidth: '380px',
-              }}
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#174D39" strokeWidth="2.2">
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-              <input
-                type="text"
-                placeholder="Search by name, valley, specialty..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+      {/* Main Container */}
+      <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '40px 24px 0 24px' }}>
+        {/* Filters and Search Bar */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            {roleFilters.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setSelectedRole(tab.id)}
                 style={{
-                  border: 'none',
-                  background: 'transparent',
-                  padding: '6px 10px',
-                  fontSize: '13.5px',
-                  color: '#10251D',
-                  outline: 'none',
-                  width: '100%',
-                }}
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#536B5E' }}
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-
-            {/* Valley Filter Select */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '12.5px', color: '#536B5E', fontWeight: 600 }}>Valley:</span>
-              <select
-                value={selectedValley}
-                onChange={(e) => setSelectedValley(e.target.value)}
-                style={{
-                  padding: '7px 14px',
+                  padding: '8px 18px',
                   borderRadius: '9999px',
                   fontSize: '13px',
                   fontWeight: 600,
-                  backgroundColor: '#F7F5EE',
-                  border: '1px solid rgba(16, 37, 29, 0.15)',
-                  color: '#10251D',
-                  outline: 'none',
+                  backgroundColor: selectedRole === tab.id ? '#174D39' : '#FFFFFF',
+                  color: selectedRole === tab.id ? '#FFFFFF' : '#10251D',
+                  border: selectedRole === tab.id ? '1px solid #174D39' : '1px solid rgba(16, 37, 29, 0.12)',
                   cursor: 'pointer',
+                  transition: 'all 0.15s ease',
                 }}
               >
-                {valleyFilters.map((vf) => (
-                  <option key={vf.id} value={vf.id}>
-                    {vf.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+                {tab.label}
+              </button>
+            ))}
           </div>
 
-          {/* Role Filter Pills */}
-          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', scrollbarWidth: 'none' }}>
-            {roleFilters.map((rf) => {
-              const active = selectedRole === rf.id;
-              return (
-                <button
-                  key={rf.id}
-                  type="button"
-                  onClick={() => setSelectedRole(rf.id)}
-                  style={{
-                    padding: '6px 16px',
-                    borderRadius: '9999px',
-                    fontSize: '12.5px',
-                    fontWeight: active ? 700 : 500,
-                    backgroundColor: active ? '#174D39' : 'transparent',
-                    color: active ? '#FFFFFF' : '#10251D',
-                    border: active ? '1px solid #174D39' : '1px solid rgba(16, 37, 29, 0.12)',
-                    whiteSpace: 'nowrap',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  {rf.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* Grid of Verified Locals */}
-      <div style={{ maxWidth: '1280px', margin: '36px auto 0 auto', padding: '0 clamp(14px, 3vw, 24px)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <div style={{ fontSize: '15px', color: '#536B5E', fontWeight: 600 }}>
-            Showing <strong>{filteredLocals.length}</strong> Verified Mountain Companions
-          </div>
-          {(selectedRole !== 'all' || selectedValley !== 'all' || searchQuery) && (
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedRole('all');
-                setSelectedValley('all');
-                setSearchQuery('');
-              }}
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <select
+              value={selectedValley}
+              onChange={(e) => setSelectedValley(e.target.value)}
               style={{
-                background: 'none',
-                border: 'none',
-                color: '#174D39',
-                fontSize: '13px',
-                fontWeight: 600,
+                padding: '8px 16px',
+                borderRadius: '9999px',
+                border: '1px solid rgba(16, 37, 29, 0.15)',
+                backgroundColor: '#FFFFFF',
+                fontSize: '13.5px',
+                color: '#10251D',
+                outline: 'none',
                 cursor: 'pointer',
               }}
             >
-              Reset Filters ✕
-            </button>
-          )}
+              <option value="all">All Valleys</option>
+              <option value="tirthan">Tirthan Valley</option>
+              <option value="jibhi">Jibhi / Banjar</option>
+              <option value="parvati">Parvati Valley</option>
+              <option value="spiti">Spiti Valley</option>
+              <option value="kullu">Kullu Valley</option>
+              <option value="kangra">Kangra / Dharamshala</option>
+            </select>
+
+            <input
+              type="text"
+              placeholder="Search by name, valley, skill..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '9999px',
+                border: '1px solid rgba(16, 37, 29, 0.15)',
+                backgroundColor: '#FFFFFF',
+                fontSize: '13.5px',
+                width: '260px',
+                outline: 'none',
+              }}
+            />
+          </div>
         </div>
 
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))',
-            gap: '24px',
-          }}
-        >
-          {filteredLocals.map((local) => {
-            const avatarFallback = local.name.split(' ').map((n) => n[0]).join('');
+        {/* Loading state */}
+        {loading && (
+          <div style={{ textAlign: 'center', padding: '60px 0', color: '#536B5E' }}>
+            <div style={{ fontSize: '32px', marginBottom: '12px' }}>🤝</div>
+            <p style={{ fontSize: '15px' }}>Loading verified companions...</p>
+          </div>
+        )}
 
-            return (
-              <article
-                key={local.id}
+        {/* Honest Empty State */}
+        {!loading && filteredLocals.length === 0 && (
+          <div
+            style={{
+              maxWidth: '640px',
+              margin: '20px auto 60px auto',
+              textAlign: 'center',
+              backgroundColor: '#FFFFFF',
+              borderRadius: '20px',
+              padding: '48px 32px',
+              border: '1px solid rgba(16, 37, 29, 0.08)',
+              boxShadow: '0 4px 20px rgba(16, 37, 29, 0.04)',
+            }}
+          >
+            <div style={{ fontSize: '42px', marginBottom: '16px' }}>🤝</div>
+            <h2
+              style={{
+                fontFamily: "'Playfair Display', Georgia, serif",
+                fontSize: '24px',
+                color: '#10251D',
+                marginBottom: '10px',
+              }}
+            >
+              No local companions are available for this location yet.
+            </h2>
+            <p style={{ fontSize: '14.5px', color: '#536B5E', lineHeight: 1.6, marginBottom: '24px' }}>
+              We do not invent companions or use demo accounts. If you live in Himachal Pradesh or hold mountaineering/first-aid certifications, apply to become a verified local companion or guide.
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={openHostApplication}
                 style={{
-                  backgroundColor: 'var(--color-bg-surface-elevated, #FFFFFF)',
-                  borderRadius: '14px',
-                  border: '1px solid rgba(10, 37, 27, 0.08)',
-                  boxShadow: '0 2px 8px rgba(10, 37, 27, 0.04)',
-                  padding: '24px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = 'rgba(101, 184, 142, 0.45)';
-                  e.currentTarget.style.boxShadow = '0 6px 18px rgba(10, 37, 27, 0.08)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = 'rgba(10, 37, 27, 0.08)';
-                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(10, 37, 27, 0.04)';
+                  padding: '11px 24px',
+                  borderRadius: '9999px',
+                  backgroundColor: '#174D39',
+                  color: '#FFFFFF',
+                  fontSize: '13.5px',
+                  fontWeight: 600,
+                  border: 'none',
+                  cursor: 'pointer',
                 }}
               >
-                {/* Header: Avatar, Name, Location */}
-                <div style={{ display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '16px' }}>
-                  <div
-                    style={{
-                      width: '64px',
-                      height: '64px',
-                      borderRadius: '50%',
-                      background: local.gradient || 'linear-gradient(135deg, #174D39, #2f725a)',
-                      color: '#FFFFFF',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '22px',
-                      fontWeight: 700,
-                      flexShrink: 0,
-                      boxShadow: '0 4px 12px rgba(23, 77, 57, 0.2)',
-                    }}
-                  >
-                    {avatarFallback}
+                Apply to Become a Local Companion
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Real Companions Grid */}
+        {!loading && filteredLocals.length > 0 && (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+              gap: '24px',
+            }}
+          >
+            {filteredLocals.map((loc) => {
+              const isCertified = Boolean(loc.certified);
+              return (
+                <div
+                  key={loc.id}
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: '16px',
+                    padding: '24px',
+                    border: '1px solid rgba(16, 37, 29, 0.08)',
+                    boxShadow: '0 2px 10px rgba(16, 37, 29, 0.04)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
+                    <div
+                      style={{
+                        width: '64px',
+                        height: '64px',
+                        borderRadius: '50%',
+                        overflow: 'hidden',
+                        backgroundColor: '#EBE7DE',
+                        flexShrink: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '24px',
+                      }}
+                    >
+                      {loc.image ? (
+                        <img src={loc.image} alt={loc.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        '🏔️'
+                      )}
+                    </div>
+                    <div>
+                      <h3 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: '20px', color: '#10251D', margin: '0 0 4px 0' }}>
+                        {loc.name}
+                      </h3>
+                      <div style={{ fontSize: '12.5px', color: '#688575', fontWeight: 600 }}>
+                        {loc.location || 'Himachal Pradesh'}
+                      </div>
+                    </div>
                   </div>
 
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                      <h3
-                        style={{
-                          fontFamily: "'Playfair Display', Georgia, serif",
-                          fontSize: '20px',
-                          color: '#10251D',
-                          margin: 0,
-                          fontWeight: 700,
-                        }}
-                      >
-                        {local.name}
-                      </h3>
+                  {/* Badges */}
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                    {isCertified ? (
                       <span
                         style={{
-                          backgroundColor: 'rgba(23, 77, 57, 0.1)',
-                          color: '#174D39',
-                          fontSize: '10.5px',
+                          fontSize: '11px',
                           fontWeight: 700,
-                          padding: '2px 7px',
+                          backgroundColor: '#fef3c7',
+                          color: '#92400e',
+                          border: '1px solid #fde68a',
+                          padding: '3px 8px',
                           borderRadius: '9999px',
                         }}
                       >
-                        ✓ Verified
+                        🏅 Certified Mountain Guide
                       </span>
-                      {local.certified && (
-                        <span
-                          style={{
-                            backgroundColor: 'rgba(142, 228, 154, 0.25)',
-                            color: '#10251D',
-                            fontSize: '10px',
-                            fontWeight: 700,
-                            padding: '2px 7px',
-                            borderRadius: '9999px',
-                          }}
-                        >
-                          🎖️ Certified
-                        </span>
-                      )}
-                    </div>
-
-                    <div style={{ fontSize: '13px', color: '#536B5E', marginTop: '2px' }}>
-                      📍 {local.location}
-                    </div>
-
-                    <div style={{ fontSize: '12px', color: '#174D39', fontWeight: 600, marginTop: '2px' }}>
-                      {local.role}
-                    </div>
+                    ) : (
+                      <span
+                        style={{
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          backgroundColor: 'rgba(23, 77, 57, 0.08)',
+                          color: '#174D39',
+                          padding: '3px 8px',
+                          borderRadius: '9999px',
+                        }}
+                      >
+                        🤝 Native Local Companion
+                      </span>
+                    )}
+                    {loc.verified && (
+                      <span
+                        style={{
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          backgroundColor: '#ecfdf5',
+                          color: '#065f46',
+                          border: '1px solid #a7f3d0',
+                          padding: '3px 8px',
+                          borderRadius: '9999px',
+                        }}
+                      >
+                        ✓ Vetted by Admin
+                      </span>
+                    )}
                   </div>
-                </div>
 
-                {/* Bio */}
-                <p
-                  style={{
-                    fontSize: '13.5px',
-                    lineHeight: 1.55,
-                    color: '#1e362c',
-                    margin: '0 0 16px 0',
-                    flex: 1,
-                  }}
-                >
-                  {local.bio}
-                </p>
+                  <p style={{ fontSize: '13.5px', color: '#536B5E', lineHeight: 1.5, margin: '0 0 16px 0', flex: 1 }}>
+                    {loc.bio || 'Native resident ready to escort travelers respectfully across local footpaths.'}
+                  </p>
 
-                {/* Spoken languages */}
-                <div style={{ fontSize: '12px', color: '#536B5E', marginBottom: '14px' }}>
-                  🗣️ <strong>Languages:</strong> {local.lang}
-                </div>
-
-                {/* Tags / Specialties */}
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '20px' }}>
-                  {local.tags?.map((t, i) => (
-                    <span
-                      key={i}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', borderTop: '1px solid rgba(16, 37, 29, 0.08)' }}>
+                    <div>
+                      <span style={{ fontSize: '18px', fontWeight: 700, color: '#174D39' }}>{loc.price || '₹500'}</span>
+                      <span style={{ fontSize: '12px', color: '#688575' }}> {loc.unit || '/day'}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => openBooking(loc, 'companion')}
                       style={{
-                        fontSize: '11px',
-                        backgroundColor: '#F7F5EE',
-                        color: '#174D39',
-                        padding: '3px 8px',
-                        borderRadius: '6px',
-                        fontWeight: 600,
-                        border: '1px solid rgba(16, 37, 29, 0.08)',
+                        padding: '8px 18px',
+                        borderRadius: '9999px',
+                        backgroundColor: '#174D39',
+                        color: '#FFFFFF',
+                        fontSize: '12.5px',
+                        fontWeight: 700,
+                        border: 'none',
+                        cursor: 'pointer',
                       }}
                     >
-                      #{t}
-                    </span>
-                  ))}
-                </div>
-
-                {/* Footer: Price & Booking Action */}
-                <div
-                  style={{
-                    borderTop: '1px solid rgba(16, 37, 29, 0.08)',
-                    paddingTop: '16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginTop: 'auto',
-                  }}
-                >
-                  <div>
-                    <div style={{ fontSize: '19px', fontWeight: 800, color: '#174D39', lineHeight: 1 }}>
-                      {local.price}
-                    </div>
-                    <div style={{ fontSize: '11px', color: '#536B5E' }}>
-                      {local.unit} honorarium
-                    </div>
+                      Connect & Book
+                    </button>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => openBooking(local, 'local')}
-                    style={{
-                      padding: '9px 18px',
-                      borderRadius: '8px',
-                      backgroundColor: 'var(--color-forest-light, #205540)',
-                      color: '#FFFFFF',
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      border: 'none',
-                      cursor: 'pointer',
-                      transition: 'background-color 0.15s ease',
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-forest-dark, #0A251B)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-forest-light, #205540)')}
-                  >
-                    Book Companion →
-                  </button>
                 </div>
-              </article>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
