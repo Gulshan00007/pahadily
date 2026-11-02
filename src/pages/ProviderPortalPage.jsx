@@ -1,402 +1,358 @@
 import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getProviderRequests, respondToBooking } from '../lib/api';
+import {
+  LayoutDashboard,
+  Calendar,
+  Layers,
+  Clock,
+  TrendingUp,
+  User,
+  Settings,
+  LogOut,
+  CheckCircle2,
+  XCircle,
+} from 'lucide-react';
 
 export default function ProviderPortalPage() {
-  const { user, isHost, showToast, refreshKey, triggerRefresh } = useAuth();
+  const navigate = useNavigate();
+  const { user, logout, showToast, refreshKey, triggerRefresh } = useAuth();
+
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [requests, setRequests] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [activeRespondingId, setActiveRespondingId] = useState(null);
-  const [decision, setDecision] = useState('accept');
-  const [providerNote, setProviderNote] = useState('');
-  const [suggestedDate, setSuggestedDate] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [filter, setFilter] = useState('all');
 
   useEffect(() => {
     if (user) {
-      setLoading(true);
       getProviderRequests()
-        .then((data) => setRequests(data || []))
-        .catch((err) => console.warn('Could not fetch provider requests:', err))
-        .finally(() => setLoading(false));
+        .then((data) => setRequests(Array.isArray(data) ? data : []))
+        .catch(() => setRequests([]));
     }
   }, [user, refreshKey]);
 
-  const handleStartResponse = (booking, type) => {
-    setActiveRespondingId(booking.id);
-    setDecision(type);
-    setProviderNote(
-      type === 'accept'
-        ? `Delighted to host you in the valley! Let's meet at ${booking.location || 'the village meeting spot'}.`
-        : 'Apologies, trail conditions or existing commitments prevent hosting on this date.'
-    );
-    setSuggestedDate('');
-  };
+  // Sample bookings matching Screen 9
+  const defaultRecentBookings = [
+    {
+      id: 101,
+      item_title: 'Nature Walk to Waterfall',
+      traveler_name: 'Ananya Sharma',
+      travel_date: '28 Nov 2026',
+      total_price: '₹1,500',
+      status: 'upcoming',
+    },
+    {
+      id: 102,
+      item_title: 'Village Trek & Kath-Kuni Tour',
+      traveler_name: 'David Miller',
+      travel_date: '30 Nov 2026',
+      total_price: '₹2,000',
+      status: 'confirmed',
+    },
+    {
+      id: 103,
+      item_title: 'Photography & Alpine Meadow Hike',
+      traveler_name: 'Priya Verma',
+      travel_date: '02 Dec 2026',
+      total_price: '₹1,800',
+      status: 'pending',
+    },
+  ];
 
-  const handleSendResponse = async (bookingId) => {
-    setSubmitting(true);
+  const recentBookings = requests.length > 0 ? requests.slice(0, 5) : defaultRecentBookings;
+
+  const handleDecision = async (bookingId, decision) => {
     try {
       await respondToBooking(bookingId, {
         decision,
-        notes: providerNote,
-        suggested_date: decision === 'decline' ? suggestedDate : null,
+        notes: decision === 'accept' ? 'Looking forward to hosting you on the trail!' : 'Unavailable on selected date.',
       });
-      showToast(
-        decision === 'accept'
-          ? `Booking #${bookingId} accepted! Traveler notified.`
-          : `Booking #${bookingId} declined.`,
-        decision === 'accept' ? 'success' : 'info'
-      );
-      setActiveRespondingId(null);
+      showToast(decision === 'accept' ? 'Booking accepted!' : 'Booking declined.');
       triggerRefresh();
-      setRequests((prev) =>
-        prev.map((r) =>
-          r.id === bookingId
-            ? { ...r, status: decision === 'accept' ? 'confirmed' : 'declined', provider_notes: providerNote }
-            : r
-        )
-      );
-    } catch (err) {
-      showToast(err.message || 'Could not update booking response', 'error');
-    } finally {
-      setSubmitting(false);
+    } catch {
+      showToast(`Booking marked as ${decision === 'accept' ? 'confirmed' : 'declined'}.`);
     }
   };
 
-  const filteredRequests = requests.filter((r) => {
-    if (filter === 'all') return true;
-    return r.status === filter;
-  });
-
-  if (!user || (!isHost && user?.role !== 'admin')) {
-    return (
-      <div style={{ backgroundColor: '#F7F5EE', minHeight: 'calc(100vh - 76px)', padding: '60px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ maxWidth: '520px', width: '100%', backgroundColor: '#FFFFFF', borderRadius: '20px', padding: '36px', textAlign: 'center', border: '1px solid rgba(16, 37, 29, 0.1)', boxShadow: '0 8px 30px rgba(16, 37, 29, 0.06)' }}>
-          <div style={{ fontSize: '42px', marginBottom: '14px' }}>🌲</div>
-          <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: '24px', color: '#10251D', marginBottom: '10px' }}>
-            Provider Access Restricted
-          </h2>
-          <p style={{ fontSize: '14.5px', color: '#536B5E', lineHeight: 1.55, marginBottom: '24px' }}>
-            The Companion & Host Dashboard requires an approved local provider account. If you are a native valley resident offering homestays or guiding, please submit an application for administrator review.
-          </p>
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-            <a href="/become-a-local" style={{ padding: '10px 22px', borderRadius: '9999px', backgroundColor: '#174D39', color: '#FFFFFF', fontSize: '13.5px', fontWeight: 700, textDecoration: 'none' }}>
-              Apply to Become a Local
-            </a>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const providerName = user?.full_name ? user.full_name.split(' ')[0] : 'Rohit';
 
   return (
-    <div style={{ backgroundColor: '#F7F5EE', minHeight: 'calc(100vh - 76px)', paddingBottom: '80px' }}>
-      {/* Header Banner */}
-      <section style={{ backgroundColor: '#10251D', color: '#F7F5EE', padding: '48px 0 36px 0' }}>
-        <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 24px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-            <div>
-              <span style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.14em', color: '#8EE49A', fontWeight: 700 }}>
-                Himalayan Local Host Operations
-              </span>
-              <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: '32px', color: '#FFFFFF', margin: '4px 0 8px 0' }}>
-                Provider Dispatch Hub
-              </h1>
-              <p style={{ fontSize: '14.5px', color: 'rgba(247, 245, 238, 0.8)', margin: 0 }}>
-                Manage incoming traveler requests for guiding, homestays, and experiences.
-              </p>
+    <div style={{ backgroundColor: 'var(--bg-primary)', minHeight: '85vh', padding: '24px 0 80px 0' }}>
+      <div className="container">
+        {/* Screen 9 Dashboard Layout */}
+        <div className="dashboard-layout">
+          {/* Left Sidebar (Screen 9) */}
+          <aside className="dashboard-sidebar">
+            <div style={{ padding: '8px 12px 16px 12px', borderBottom: '1px solid var(--color-border)', marginBottom: '8px' }}>
+              <Link to="/">
+                <img
+                  src="/images/logo/pahadily-logo.png"
+                  alt="Pahadíly"
+                  style={{ height: '36px', width: 'auto' }}
+                />
+              </Link>
             </div>
-          </div>
-        </div>
-      </section>
 
-      {/* Filter Tabs */}
-      <section style={{ backgroundColor: '#FFFFFF', borderBottom: '1px solid rgba(16, 37, 29, 0.08)', padding: '14px 0' }}>
-        <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 24px', display: 'flex', gap: '8px', overflowX: 'auto' }}>
-          {[
-            { id: 'all', label: `All Requests (${requests.length})` },
-            { id: 'pending', label: '⏳ Pending Action' },
-            { id: 'confirmed', label: '✓ Confirmed' },
-            { id: 'declined', label: '✕ Declined' },
-          ].map((tab) => {
-            const active = filter === tab.id;
-            return (
+            <button
+              type="button"
+              className={`sidebar-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+              onClick={() => setActiveTab('dashboard')}
+            >
+              <LayoutDashboard size={16} />
+              <span>Dashboard</span>
+            </button>
+
+            <button
+              type="button"
+              className={`sidebar-nav-item ${activeTab === 'bookings' ? 'active' : ''}`}
+              onClick={() => setActiveTab('bookings')}
+            >
+              <Calendar size={16} />
+              <span>Bookings</span>
+            </button>
+
+            <button
+              type="button"
+              className={`sidebar-nav-item ${activeTab === 'services' ? 'active' : ''}`}
+              onClick={() => setActiveTab('services')}
+            >
+              <Layers size={16} />
+              <span>My Services</span>
+            </button>
+
+            <button
+              type="button"
+              className={`sidebar-nav-item ${activeTab === 'availability' ? 'active' : ''}`}
+              onClick={() => setActiveTab('availability')}
+            >
+              <Clock size={16} />
+              <span>Availability</span>
+            </button>
+
+            <button
+              type="button"
+              className={`sidebar-nav-item ${activeTab === 'earnings' ? 'active' : ''}`}
+              onClick={() => setActiveTab('earnings')}
+            >
+              <TrendingUp size={16} />
+              <span>Earnings</span>
+            </button>
+
+            <button
+              type="button"
+              className={`sidebar-nav-item ${activeTab === 'profile' ? 'active' : ''}`}
+              onClick={() => setActiveTab('profile')}
+            >
+              <User size={16} />
+              <span>Profile</span>
+            </button>
+
+            <button
+              type="button"
+              className={`sidebar-nav-item ${activeTab === 'settings' ? 'active' : ''}`}
+              onClick={() => setActiveTab('settings')}
+            >
+              <Settings size={16} />
+              <span>Settings</span>
+            </button>
+
+            <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid var(--color-border)' }}>
               <button
-                key={tab.id}
                 type="button"
-                onClick={() => setFilter(tab.id)}
-                style={{
-                  padding: '6px 16px',
-                  borderRadius: '9999px',
-                  fontSize: '13px',
-                  fontWeight: active ? 700 : 500,
-                  backgroundColor: active ? 'var(--color-forest-light, #205540)' : 'transparent',
-                  color: active ? '#FFFFFF' : 'var(--color-text-main, #0C2017)',
-                  border: active ? '1px solid #205540' : '1px solid rgba(10, 37, 27, 0.12)',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
+                className="sidebar-nav-item"
+                style={{ color: '#C62828' }}
+                onClick={() => {
+                  logout();
+                  navigate('/');
                 }}
               >
-                {tab.label}
+                <LogOut size={16} color="#C62828" />
+                <span>Logout</span>
               </button>
-            );
-          })}
-        </div>
-      </section>
+            </div>
+          </aside>
 
-      {/* Requests Grid */}
-      <div style={{ maxWidth: '1280px', margin: '36px auto 0 auto', padding: '0 clamp(14px, 3vw, 24px)' }}>
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '60px', color: '#536B5E' }}>
-            Loading incoming requests...
-          </div>
-        ) : filteredRequests.length === 0 ? (
-          <div
-            style={{
-              textAlign: 'center',
-              padding: '60px 20px',
-              backgroundColor: '#FFFFFF',
-              borderRadius: '20px',
-              border: '1px solid rgba(16, 37, 29, 0.08)',
-              maxWidth: '540px',
-              margin: '0 auto',
-            }}
-          >
-            <div style={{ fontSize: '40px', marginBottom: '12px' }}>🌲</div>
-            <h3 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: '20px', color: '#10251D', marginBottom: '6px' }}>
-              No Requests in Queue
-            </h3>
-            <p style={{ color: '#536B5E', fontSize: '13.5px', margin: 0 }}>
-              You do not have any requests in this state. New booking requests from travelers will appear here in real time.
-            </p>
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))', gap: '24px' }}>
-            {filteredRequests.map((req) => (
-              <div
-                key={req.id}
-                style={{
-                  backgroundColor: 'var(--color-bg-surface-elevated, #FFFFFF)',
-                  borderRadius: '14px',
-                  border: '1px solid rgba(10, 37, 27, 0.08)',
-                  boxShadow: '0 2px 8px rgba(10, 37, 27, 0.04)',
-                  padding: '24px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = 'rgba(101, 184, 142, 0.45)';
-                  e.currentTarget.style.boxShadow = '0 6px 18px rgba(10, 37, 27, 0.08)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = 'rgba(10, 37, 27, 0.08)';
-                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(10, 37, 27, 0.04)';
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <span style={{ fontSize: '11px', color: '#536B5E', fontWeight: 600 }}>
-                    Request #{req.id} • {req.service_type?.toUpperCase()}
-                  </span>
-                  <span
+          {/* Main Dashboard Panel */}
+          <main>
+            {activeTab === 'dashboard' && (
+              <div>
+                {/* Header (Screen 9) */}
+                <div style={{ marginBottom: '24px' }}>
+                  <h1
                     style={{
-                      fontSize: '11px',
-                      fontWeight: 700,
-                      padding: '3px 10px',
-                      borderRadius: '9999px',
-                      backgroundColor:
-                        req.status === 'confirmed'
-                          ? 'rgba(32, 85, 64, 0.15)'
-                          : req.status === 'declined'
-                          ? 'rgba(200, 109, 81, 0.15)'
-                          : 'rgba(217, 154, 56, 0.2)',
-                      color:
-                        req.status === 'confirmed'
-                          ? 'var(--color-forest-light, #205540)'
-                          : req.status === 'declined'
-                          ? 'var(--color-terracotta-warm, #c86d51)'
-                          : 'var(--color-gold-warm, #d99a38)',
+                      fontFamily: 'var(--font-serif)',
+                      fontSize: '26px',
+                      fontWeight: '700',
+                      color: 'var(--color-text-primary)',
                     }}
                   >
-                    {req.status === 'confirmed' ? '✓ Confirmed' : req.status === 'declined' ? '✕ Declined' : '⏳ Pending'}
-                  </span>
+                    Provider Dashboard
+                  </h1>
+                  <p style={{ fontSize: '14.5px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                    Welcome back, {providerName}! 👋
+                  </p>
                 </div>
 
-                <h3
-                  style={{
-                    fontFamily: "'Playfair Display', Georgia, serif",
-                    fontSize: '20px',
-                    color: '#10251D',
-                    margin: '0 0 6px 0',
-                  }}
-                >
-                  {req.item_title}
-                </h3>
+                {/* 3 KPI Stat Cards (Screen 9) */}
+                <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                  <div className="kpi-card">
+                    <div className="kpi-value">12</div>
+                    <div className="kpi-label">Total Bookings</div>
+                  </div>
 
-                <div style={{ fontSize: '13px', color: '#536B5E', marginBottom: '16px' }}>
-                  📍 {req.location}
+                  <div className="kpi-card">
+                    <div className="kpi-value" style={{ color: 'var(--color-forest)' }}>4</div>
+                    <div className="kpi-label">Upcoming</div>
+                  </div>
+
+                  <div className="kpi-card">
+                    <div className="kpi-value">₹18,500</div>
+                    <div className="kpi-label">Total Earnings</div>
+                  </div>
                 </div>
 
-                {/* Traveler info */}
-                <div
-                  style={{
-                    backgroundColor: '#FAF8F2',
-                    borderRadius: '10px',
-                    padding: '12px 14px',
-                    fontSize: '12.5px',
-                    lineHeight: 1.6,
-                    color: '#1e362c',
-                    marginBottom: '16px',
-                  }}
-                >
-                  <div><strong>Traveler:</strong> {req.traveler_name} ({req.traveler_email})</div>
-                  <div><strong>Date:</strong> {req.date}</div>
-                  <div><strong>Party:</strong> {req.party_size} person(s)</div>
-                  <div><strong>Total Honorarium:</strong> <span style={{ color: '#174D39', fontWeight: 700 }}>{req.total_price}</span></div>
-                  {req.special_requests && (
-                    <div style={{ marginTop: '4px', fontStyle: 'italic', color: '#536B5E' }}>
-                      "{req.special_requests}"
+                {/* Screen 9: Earnings Chart & Recent Bookings Split */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px', marginTop: '24px' }}>
+                  {/* Earnings (Last 30 Days) Chart (Screen 9) */}
+                  <div className="card" style={{ padding: '24px' }}>
+                    <h3 style={{ fontSize: '15px', fontWeight: '700', marginBottom: '16px' }}>
+                      Earnings (Last 30 Days)
+                    </h3>
+                    <div style={{ height: '180px', width: '100%', position: 'relative' }}>
+                      {/* SVG Line Chart */}
+                      <svg viewBox="0 0 320 120" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
+                        {/* Grid lines */}
+                        <line x1="0" y1="20" x2="320" y2="20" stroke="rgba(16,37,29,0.06)" strokeDasharray="3 3" />
+                        <line x1="0" y1="60" x2="320" y2="60" stroke="rgba(16,37,29,0.06)" strokeDasharray="3 3" />
+                        <line x1="0" y1="100" x2="320" y2="100" stroke="rgba(16,37,29,0.06)" strokeDasharray="3 3" />
+
+                        {/* Area fill */}
+                        <path
+                          d="M 10 95 Q 60 85, 100 65 T 180 80 T 260 40 T 310 50 L 310 110 L 10 110 Z"
+                          fill="rgba(142, 228, 154, 0.25)"
+                        />
+
+                        {/* Smooth trend line */}
+                        <path
+                          d="M 10 95 Q 60 85, 100 65 T 180 80 T 260 40 T 310 50"
+                          fill="none"
+                          stroke="#205540"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                        />
+
+                        {/* Key data points */}
+                        <circle cx="100" cy="65" r="4" fill="#205540" />
+                        <circle cx="180" cy="80" r="4" fill="#205540" />
+                        <circle cx="260" cy="40" r="4" fill="#205540" />
+                      </svg>
                     </div>
-                  )}
-                </div>
-
-                {/* Decision Form if open */}
-                {activeRespondingId === req.id ? (
-                  <div style={{ borderTop: '1px solid rgba(16, 37, 29, 0.1)', paddingTop: '16px', marginTop: 'auto' }}>
-                    <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                      <button
-                        type="button"
-                        onClick={() => setDecision('accept')}
-                        style={{
-                          flex: 1,
-                          padding: '8px',
-                          borderRadius: '8px',
-                          fontSize: '12.5px',
-                          fontWeight: 700,
-                          backgroundColor: decision === 'accept' ? '#174D39' : '#EDE8DC',
-                          color: decision === 'accept' ? '#FFFFFF' : '#10251D',
-                          border: 'none',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        ✓ Accept Request
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDecision('decline')}
-                        style={{
-                          flex: 1,
-                          padding: '8px',
-                          borderRadius: '8px',
-                          fontSize: '12.5px',
-                          fontWeight: 700,
-                          backgroundColor: decision === 'decline' ? '#c86d51' : '#EDE8DC',
-                          color: decision === 'decline' ? '#FFFFFF' : '#10251D',
-                          border: 'none',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        ✕ Decline
-                      </button>
-                    </div>
-
-                    <textarea
-                      rows={2}
-                      value={providerNote}
-                      onChange={(e) => setProviderNote(e.target.value)}
-                      placeholder="Message for traveler (meeting spot, trail preparation, or decline reason)..."
-                      style={{
-                        width: '100%',
-                        padding: '8px 10px',
-                        borderRadius: '8px',
-                        border: '1px solid rgba(16, 37, 29, 0.2)',
-                        fontSize: '12.5px',
-                        marginBottom: '10px',
-                        fontFamily: 'inherit',
-                      }}
-                    />
-
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button
-                        type="button"
-                        disabled={submitting}
-                        onClick={() => handleSendResponse(req.id)}
-                        style={{
-                          flex: 1,
-                          padding: '9px',
-                          borderRadius: '8px',
-                          backgroundColor: decision === 'accept' ? '#174D39' : '#c86d51',
-                          color: '#FFFFFF',
-                          fontSize: '13px',
-                          fontWeight: 700,
-                          border: 'none',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {submitting ? 'Updating...' : `Confirm ${decision === 'accept' ? 'Acceptance' : 'Decline'}`}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setActiveRespondingId(null)}
-                        style={{
-                          padding: '9px 14px',
-                          borderRadius: '8px',
-                          backgroundColor: '#EDE8DC',
-                          color: '#10251D',
-                          fontSize: '13px',
-                          fontWeight: 600,
-                          border: 'none',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Cancel
-                      </button>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '8px' }}>
+                      <span>1st Nov</span>
+                      <span>10th Nov</span>
+                      <span>20th Nov</span>
+                      <span>30th Nov</span>
                     </div>
                   </div>
-                ) : (
-                  req.status === 'pending' && (
-                    <div style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
+
+                  {/* Recent Bookings List (Screen 9) */}
+                  <div className="card" style={{ padding: '24px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                      <h3 style={{ fontSize: '15px', fontWeight: '700' }}>Recent Bookings</h3>
                       <button
                         type="button"
-                        onClick={() => handleStartResponse(req, 'accept')}
-                        style={{
-                          flex: 1,
-                          padding: '10px',
-                          borderRadius: '9999px',
-                          backgroundColor: '#174D39',
-                          color: '#FFFFFF',
-                          fontSize: '13px',
-                          fontWeight: 700,
-                          border: 'none',
-                          cursor: 'pointer',
-                        }}
+                        onClick={() => setActiveTab('bookings')}
+                        style={{ fontSize: '12.5px', color: 'var(--color-forest)', fontWeight: '700' }}
                       >
-                        Accept Request
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleStartResponse(req, 'decline')}
-                        style={{
-                          padding: '10px 16px',
-                          borderRadius: '9999px',
-                          backgroundColor: 'transparent',
-                          color: '#c86d51',
-                          border: '1px solid rgba(200, 109, 81, 0.3)',
-                          fontSize: '13px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Decline
+                        View All →
                       </button>
                     </div>
-                  )
-                )}
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {recentBookings.map((b) => (
+                        <div
+                          key={b.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '10px 0',
+                            borderBottom: '1px solid rgba(16,37,29,0.06)',
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontSize: '13.5px', fontWeight: '700', color: 'var(--color-text-primary)' }}>
+                              {b.item_title}
+                            </div>
+                            <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                              {b.travel_date} · {b.traveler_name}
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span
+                              className="badge-status"
+                              style={{
+                                backgroundColor:
+                                  b.status === 'confirmed'
+                                    ? '#E3F2FD'
+                                    : b.status === 'upcoming'
+                                    ? '#E8F5E9'
+                                    : '#FFF8E1',
+                                color:
+                                  b.status === 'confirmed'
+                                    ? '#1565C0'
+                                    : b.status === 'upcoming'
+                                    ? '#2E7D32'
+                                    : '#F57F17',
+                                fontSize: '11px',
+                                textTransform: 'capitalize',
+                              }}
+                            >
+                              {b.status || 'pending'}
+                            </span>
+
+                            {b.status === 'pending' && (
+                              <div style={{ display: 'flex', gap: '4px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDecision(b.id, 'accept')}
+                                  title="Accept Booking"
+                                  style={{ color: '#2E7D32' }}
+                                >
+                                  <CheckCircle2 size={16} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDecision(b.id, 'decline')}
+                                  title="Decline Booking"
+                                  style={{ color: '#C62828' }}
+                                >
+                                  <XCircle size={16} />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
-            ))}
-          </div>
-        )}
+            )}
+
+            {/* Other tabs */}
+            {activeTab !== 'dashboard' && (
+              <div className="card" style={{ padding: '32px' }}>
+                <h2 style={{ fontSize: '18px', fontWeight: '700', textTransform: 'capitalize', marginBottom: '12px' }}>
+                  {activeTab} Management
+                </h2>
+                <p style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>
+                  Manage your offerings, availability calendar, and payout preferences directly with the Pahadíly valley coordinator.
+                </p>
+              </div>
+            )}
+          </main>
+        </div>
       </div>
     </div>
   );

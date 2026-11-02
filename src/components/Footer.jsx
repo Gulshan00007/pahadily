@@ -1,255 +1,179 @@
 import { Link } from 'react-router-dom';
 
 export default function Footer() {
-
   return (
     <footer
       style={{
-        backgroundColor: '#10251D',
-        color: '#F7F5EE',
-        padding: '72px 0 36px 0',
-        borderTop: '1px solid rgba(142, 228, 154, 0.12)',
+        backgroundColor: '#FAF8F2',
+        borderTop: '1px solid rgba(16, 37, 29, 0.08)',
+        padding: '56px 0 36px 0',
+        marginTop: '64px',
       }}
     >
-      <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 24px' }}>
+      <div className="container">
+        {/* Main Footer Row */}
         <div
           style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: '48px',
-            marginBottom: '56px',
+            display: 'flex',
+            flexWrap: 'wrap',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: '40px',
+            marginBottom: '40px',
           }}
         >
-          {/* Col 1: Brand Info & Official Logo */}
+          {/* Brand Info */}
           <div style={{ maxWidth: '340px' }}>
-            <div style={{ marginBottom: '20px' }}>
-              <Link to="/" style={{ display: 'inline-block' }}>
-                <img
-                  src="/images/logo/pahadily-logo.png"
-                  alt="Pahadíly"
-                  style={{
-                    height: '52px',
-                    width: 'auto',
-                    objectFit: 'contain',
-                    filter: 'brightness(0) invert(1)',
-                  }}
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                    const fallback = document.getElementById('footer-brand-fallback');
-                    if (fallback) fallback.style.display = 'block';
-                  }}
-                />
-                <span
-                  id="footer-brand-fallback"
-                  style={{
-                    display: 'none',
-                    fontFamily: "'Playfair Display', Georgia, serif",
-                    fontSize: '28px',
-                    fontWeight: 700,
-                    color: '#F7F5EE',
-                  }}
-                >
-                  Pahadíly
-                </span>
-              </Link>
-            </div>
-
-            <div
-              style={{
-                fontFamily: "'Playfair Display', Georgia, serif",
-                fontSize: '13px',
-                letterSpacing: '0.12em',
-                color: '#8EE49A',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                marginBottom: '12px',
-              }}
-            >
-              RARE PLACES. REAL PEOPLE. LASTING STORIES.
-            </div>
-
+            <Link to="/" style={{ display: 'inline-block', marginBottom: '14px' }}>
+              <img
+                src="/images/logo/pahadily-logo.png"
+                alt="Pahadíly"
+                style={{ height: '42px', width: 'auto', objectFit: 'contain' }}
+              />
+            </Link>
             <p
               style={{
-                color: 'rgba(247, 245, 238, 0.72)',
                 fontSize: '13.5px',
-                lineHeight: 1.65,
+                lineHeight: '1.6',
+                color: '#69766D',
                 margin: 0,
               }}
             >
-              Pahadíly is an authentic Himalayan discovery and community-earning platform. We connect mindful travelers directly with native companions, family homestays, and certified guides across Himachal Pradesh.
+              Connecting travelers with verified local companions, traditional homestays, and authentic mountain experiences across Himachal Pradesh.
             </p>
           </div>
 
-          {/* Col 2: Explore & Valleys */}
-          <div>
-            <h4
-              style={{
-                fontSize: '12.5px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.14em',
-                color: '#D9C5A3',
-                marginBottom: '18px',
-                fontWeight: 700,
-              }}
-            >
-              Explore & Valleys
-            </h4>
-            <ul
-              style={{
-                listStyle: 'none',
-                padding: 0,
-                margin: 0,
-                fontSize: '14px',
-                lineHeight: 2.2,
-                color: 'rgba(247, 245, 238, 0.8)',
-              }}
-            >
-              <li>
-                <Link to="/explore" style={{ color: 'inherit', textDecoration: 'none' }}>
-                  Explore Destinations Directory
-                </Link>
-              </li>
-              <li>
-                <Link to="/explore?valley=tirthan" style={{ color: 'inherit', textDecoration: 'none' }}>
-                  Tirthan Valley & GHNP
-                </Link>
-              </li>
-              <li>
-                <Link to="/explore?valley=jibhi" style={{ color: 'inherit', textDecoration: 'none' }}>
-                  Jibhi & Chehni Kothi
-                </Link>
-              </li>
-              <li>
-                <Link to="/explore?valley=shangarh" style={{ color: 'inherit', textDecoration: 'none' }}>
-                  Shangarh Sacred Meadow
-                </Link>
-              </li>
-              <li>
-                <Link to="/explore?valley=naggar" style={{ color: 'inherit', textDecoration: 'none' }}>
-                  Naggar Castle & Heritage
-                </Link>
-              </li>
-              <li>
-                <Link to="/explore?valley=lug-valley" style={{ color: 'inherit', textDecoration: 'none' }}>
-                  Lug Valley Hamlets
-                </Link>
-              </li>
-            </ul>
-          </div>
+          {/* Quick Navigation Links */}
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 'clamp(24px, 5vw, 48px)',
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  color: '#10251D',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  marginBottom: '14px',
+                }}
+              >
+                Explore
+              </div>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <li>
+                  <Link to="/explore" style={{ fontSize: '13.5px', color: '#69766D', textDecoration: 'none' }}>
+                    Destinations
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/companions" style={{ fontSize: '13.5px', color: '#69766D', textDecoration: 'none' }}>
+                    Find a Local
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/stays" style={{ fontSize: '13.5px', color: '#69766D', textDecoration: 'none' }}>
+                    Homestays
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/experiences" style={{ fontSize: '13.5px', color: '#69766D', textDecoration: 'none' }}>
+                    Experiences
+                  </Link>
+                </li>
+              </ul>
+            </div>
 
-          {/* Col 3: Experiences & Homestays */}
-          <div>
-            <h4
-              style={{
-                fontSize: '12.5px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.14em',
-                color: '#D9C5A3',
-                marginBottom: '18px',
-                fontWeight: 700,
-              }}
-            >
-              Experiences & Stays
-            </h4>
-            <ul
-              style={{
-                listStyle: 'none',
-                padding: 0,
-                margin: 0,
-                fontSize: '14px',
-                lineHeight: 2.2,
-                color: 'rgba(247, 245, 238, 0.8)',
-              }}
-            >
-              <li>
-                <Link to="/experiences" style={{ color: 'inherit', textDecoration: 'none' }}>
-                  Authentic Himalayan Experiences
-                </Link>
-              </li>
-              <li>
-                <Link to="/companions" style={{ color: 'inherit', textDecoration: 'none' }}>
-                  Verified Local Companions
-                </Link>
-              </li>
-              <li>
-                <Link to="/stays" style={{ color: 'inherit', textDecoration: 'none' }}>
-                  Kath-Kuni & Village Stays
-                </Link>
-              </li>
-              <li>
-                <Link to="/become-a-local" style={{ color: '#8EE49A', fontWeight: 600, textDecoration: 'none' }}>
-                  Become a Local Host / Guide ↗
-                </Link>
-              </li>
-            </ul>
-          </div>
+            <div>
+              <div
+                style={{
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  color: '#10251D',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  marginBottom: '14px',
+                }}
+              >
+                Community
+              </div>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <li>
+                  <Link to="/become-a-local" style={{ fontSize: '13.5px', color: '#69766D', textDecoration: 'none' }}>
+                    Become a Local
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/about" style={{ fontSize: '13.5px', color: '#69766D', textDecoration: 'none' }}>
+                    About Pahadíly
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/safety" style={{ fontSize: '13.5px', color: '#69766D', textDecoration: 'none' }}>
+                    Safety Guidelines
+                  </Link>
+                </li>
+              </ul>
+            </div>
 
-          {/* Col 4: Community Ethos & Safety */}
-          <div>
-            <h4
-              style={{
-                fontSize: '12.5px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.14em',
-                color: '#D9C5A3',
-                marginBottom: '18px',
-                fontWeight: 700,
-              }}
-            >
-              Ethos & Mountain Care
-            </h4>
-            <p
-              style={{
-                color: 'rgba(247, 245, 238, 0.72)',
-                fontSize: '13px',
-                lineHeight: 1.6,
-                margin: '0 0 14px 0',
-              }}
-            >
-              85–90% of all payments flow directly to native guides, homestay families, and trail cooks. We strictly adhere to sacred Devta sanctuary codes and Leave-No-Trace principles.
-            </p>
-            <div
-              style={{
-                backgroundColor: 'rgba(23, 77, 57, 0.4)',
-                padding: '12px 14px',
-                borderRadius: '10px',
-                border: '1px solid rgba(142, 228, 154, 0.2)',
-              }}
-            >
-              <div style={{ fontSize: '11px', color: '#D9C5A3', fontWeight: 700, textTransform: 'uppercase' }}>
-                Himalayan Safety Helplines
+            <div>
+              <div
+                style={{
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  color: '#10251D',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  marginBottom: '14px',
+                }}
+              >
+                Trust & Support
               </div>
-              <div style={{ fontSize: '12.5px', color: '#FFFFFF', marginTop: '4px' }}>
-                Kullu Disaster Control: <strong>1077</strong>
-              </div>
-              <div style={{ fontSize: '12.5px', color: '#FFFFFF' }}>
-                Unified Mountain Emergency: <strong>112</strong>
-              </div>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <li>
+                  <Link to="/help" style={{ fontSize: '13.5px', color: '#69766D', textDecoration: 'none' }}>
+                    Help & FAQs
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/terms" style={{ fontSize: '13.5px', color: '#69766D', textDecoration: 'none' }}>
+                    Terms of Service
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/privacy" style={{ fontSize: '13.5px', color: '#69766D', textDecoration: 'none' }}>
+                    Privacy Policy
+                  </Link>
+                </li>
+              </ul>
             </div>
           </div>
         </div>
 
-        {/* Bottom Bar: Copyright & Policies */}
+        {/* Hairline Separator */}
+        <hr style={{ border: 'none', borderTop: '1px solid rgba(16, 37, 29, 0.08)', margin: '0 0 24px 0' }} />
+
+        {/* Bottom Copyright */}
         <div
           style={{
-            borderTop: '1px solid rgba(247, 245, 238, 0.1)',
-            paddingTop: '28px',
             display: 'flex',
             flexWrap: 'wrap',
-            alignItems: 'center',
             justifyContent: 'space-between',
-            gap: '16px',
+            alignItems: 'center',
+            gap: '12px',
             fontSize: '12.5px',
-            color: 'rgba(247, 245, 238, 0.65)',
+            color: '#84948A',
           }}
         >
           <div>
-            © {new Date().getFullYear()} Pahadíly Inc. All rights reserved. Handcrafted with reverence for the Western Himalayas.
+            © {new Date().getFullYear()} Pahadíly. Rare Places. Real People. Lasting Stories.
           </div>
-          <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
-            <span>Zero-Middleman Guarantee</span>
-            <span>Sacred Devta Code</span>
-            <span>Pack-It-In Pack-It-Out</span>
+          <div>
+            Himachal Pradesh, India
           </div>
         </div>
       </div>

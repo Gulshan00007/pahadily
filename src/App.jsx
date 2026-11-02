@@ -8,11 +8,13 @@ import HomePage from './pages/HomePage';
 import ExplorePage from './pages/ExplorePage';
 import ExperiencesPage from './pages/ExperiencesPage';
 import CompanionsPage from './pages/CompanionsPage';
+import CompanionDetailPage from './pages/CompanionDetailPage';
 import StaysPage from './pages/StaysPage';
 import BecomeALocalPage from './pages/BecomeALocalPage';
 import MyBookingsPage from './pages/MyBookingsPage';
 import ProviderPortalPage from './pages/ProviderPortalPage';
 import AdminPortalPage from './pages/AdminPortalPage';
+import StaticInfoPage from './pages/StaticInfoPage';
 
 // Global Modals & Notifications
 import AuthModal from './components/modals/AuthModal';
@@ -32,10 +34,10 @@ function AppLayout() {
         minHeight: '100vh',
         display: 'flex',
         flexDirection: 'column',
-        backgroundColor: '#F7F5EE',
+        backgroundColor: 'var(--bg-primary)',
       }}
     >
-      {/* 1. Official Pahadíly Brand Logo & Role-Aware Sticky Navbar */}
+      {/* 1. Official Pahadíly Brand Logo & Responsive Navbar (Screen 1) */}
       <Navbar />
 
       {/* 2. Main Content Routing */}
@@ -46,12 +48,22 @@ function AppLayout() {
           <Route path="/experiences" element={<ExperiencesPage />} />
           <Route path="/companions" element={<CompanionsPage />} />
           <Route path="/locals" element={<CompanionsPage />} />
+          <Route path="/companion/:id" element={<CompanionDetailPage />} />
           <Route path="/stays" element={<StaysPage />} />
           <Route path="/stories" element={<Navigate to="/explore" replace />} />
           <Route path="/become-a-local" element={<BecomeALocalPage />} />
           <Route path="/my-bookings" element={<MyBookingsPage />} />
           <Route path="/provider-portal" element={<ProviderPortalPage />} />
           <Route path="/admin" element={<AdminPortalPage />} />
+          
+          {/* Static informational pages (Screen 12) */}
+          <Route path="/about" element={<StaticInfoPage />} />
+          <Route path="/how-it-works" element={<StaticInfoPage />} />
+          <Route path="/safety" element={<StaticInfoPage />} />
+          <Route path="/help" element={<StaticInfoPage />} />
+          <Route path="/terms" element={<StaticInfoPage />} />
+          <Route path="/privacy" element={<StaticInfoPage />} />
+
           {/* Fallback to Home */}
           <Route path="*" element={<HomePage />} />
         </Routes>

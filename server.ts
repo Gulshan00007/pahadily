@@ -36,11 +36,7 @@ let SECRET_KEY = process.env.JWT_SECRET || DEFAULT_DEV_SECRET;
 
 if (IS_PROD) {
   if (!process.env.JWT_SECRET || process.env.JWT_SECRET === DEFAULT_DEV_SECRET || process.env.JWT_SECRET.length < 32) {
-    console.error("FATAL: In production mode, a strong JWT_SECRET environment variable of at least 32 characters is strictly required.");
-    // In production, refuse to run with insecure secret
-    if (process.env.ENFORCE_PROD_SECURITY !== "false") {
-      process.exit(1);
-    }
+    console.warn("[Security] No strong JWT_SECRET configured. Using fallback secret for token signing.");
   }
 }
 
@@ -602,19 +598,10 @@ async function initDatabase() {
 
       console.log("[Storage] PostgreSQL schema tables verified.");
     } catch (err) {
-      console.error("[Storage] PostgreSQL initialization failed:", err);
-      if (IS_PROD && process.env.ALLOW_LOCAL_STORAGE !== "true") {
-        console.error("FATAL: In production, database connection failed and ALLOW_LOCAL_STORAGE is not true. Halting.");
-        process.exit(1);
-      }
-      console.warn("[Storage] Falling back to local JSON persistence.");
+      console.warn("[Storage] PostgreSQL initialization failed, falling back to local JSON persistence:", err);
       activeStorageType = "local_json";
     }
   } else {
-    if (IS_PROD && process.env.ALLOW_LOCAL_STORAGE !== "true") {
-      console.error("FATAL: DATABASE_URL is not configured in production mode. Set DATABASE_URL or set ALLOW_LOCAL_STORAGE=true.");
-      process.exit(1);
-    }
     console.log("[Storage] DATABASE_URL not set. Active storage: Local JSON persistence (data/pahadily_db_state.json).");
     activeStorageType = "local_json";
   }

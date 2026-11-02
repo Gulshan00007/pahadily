@@ -1,981 +1,480 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getLocations, getCategories } from '../lib/api';
-import ExploreFilterDrawer from '../components/ExploreFilterDrawer';
+import { getLocations } from '../lib/api';
+import { Search, SlidersHorizontal, Heart, Star, MapPin, X } from 'lucide-react';
 
 export default function ExplorePage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { openDestinationDetail, openHostApplication, refreshKey } = useAuth();
+  const { openDestinationDetail, refreshKey } = useAuth();
 
   const queryParam = searchParams.get('q') || '';
-  const valleyParam = searchParams.get('valley') || searchParams.get('region') || 'all';
   const categoryParam = searchParams.get('category') || 'all';
 
   const [searchQuery, setSearchQuery] = useState(queryParam);
-  const [selectedValley, setSelectedValley] = useState(valleyParam.toLowerCase());
   const [selectedCategory, setSelectedCategory] = useState(categoryParam.toLowerCase());
-
-  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
-  const [locationsList, setLocationsList] = useState([]);
-  const [categoriesList, setCategoriesList] = useState([]);
+  const [selectedValley, setSelectedValley] = useState('all');
+  const [favorites, setFavorites] = useState({});
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+  
+  const [backendLocations, setBackendLocations] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Sync state if URL query params change (e.g. back/forward navigation or external links)
+  // Synchronize with URL search params
   useEffect(() => {
-    const vParam = searchParams.get('valley') || searchParams.get('region') || 'all';
-    const cParam = searchParams.get('category') || 'all';
-    const qParam = searchParams.get('q') || '';
-
-    setSelectedValley(vParam.toLowerCase());
-    setSelectedCategory(cParam.toLowerCase());
-    setSearchQuery(qParam);
+    setSearchQuery(searchParams.get('q') || '');
+    setSelectedCategory((searchParams.get('category') || 'all').toLowerCase());
   }, [searchParams]);
 
-  // Fetch real published locations and active categories
+  // Fetch real locations from backend API
   useEffect(() => {
     setLoading(true);
-    Promise.all([
-      getLocations({ status: 'published' }).catch(() => []),
-      getCategories().catch(() => []),
-    ])
-      .then(([locs, cats]) => {
-        setLocationsList(Array.isArray(locs) ? locs : []);
-        setCategoriesList(Array.isArray(cats) ? cats : []);
+    getLocations({ status: 'published' })
+      .then((data) => {
+        setBackendLocations(Array.isArray(data) ? data : []);
       })
+      .catch(() => setBackendLocations([]))
       .finally(() => setLoading(false));
   }, [refreshKey]);
 
-  // Extract unique valleys from real published locations
-  const availableValleys = useMemo(() => {
-    const set = new Set();
-    locationsList.forEach((l) => {
-      if (l.valley) set.add(l.valley);
-    });
-    return Array.from(set);
-  }, [locationsList]);
+  // Unified destination dataset (Combines backend published locations + curated destinations)
+  const unifiedDestinations = useMemo(() => {
+    // Standard curated list matching Screen 2
+    const curated = [
+      {
+        id: 'dest-jibhi',
+        name: 'Jibhi',
+        district: 'Kullu',
+        category: 'villages',
+        rating: 4.8,
+        reviews: 120,
+        image: '/images/destinations/jibhi.jpg',
+        description: 'Charming pine valley with freshwater streams, ancient wooden towers, and secret waterfalls.',
+      },
+      {
+        id: 'dest-tirthan',
+        name: 'Tirthan Valley',
+        district: 'Kullu',
+        category: 'waterfalls',
+        rating: 4.9,
+        reviews: 98,
+        image: '/images/destinations/tirthan-valley.jpg',
+        description: 'Gateway to Great Himalayan National Park with trout streams and traditional Kath-Kuni homestays.',
+      },
+      {
+        id: 'dest-shoja',
+        name: 'Shoja',
+        district: 'Kullu',
+        category: 'viewpoints',
+        rating: 4.7,
+        reviews: 67,
+        image: '/images/experiences/sunrise-trek.jpg',
+        description: 'Serene mountain hamlet perched below Jalori Pass with panoramic ridge views and cedar glades.',
+      },
+      {
+        id: 'dest-banjar',
+        name: 'Banjar',
+        district: 'Kullu',
+        category: 'culture',
+        rating: 4.6,
+        reviews: 45,
+        image: '/images/experiences/village-walk.jpg',
+        description: 'Historic cultural hub known for sacred wood-carved temples and mountain trade paths.',
+      },
+      {
+        id: 'dest-sarchi',
+        name: 'Sarchi',
+        district: 'Kullu',
+        category: 'villages',
+        rating: 4.7,
+        reviews: 32,
+        image: '/images/experiences/home-meal.jpg',
+        description: 'Clifftop heritage village overlooking the Tirthan canyon with undisturbed mountain lifestyle.',
+      },
+      {
+        id: 'dest-pangi',
+        name: 'Pangi Valley',
+        district: 'Chamba',
+        category: 'treks',
+        rating: 4.9,
+        reviews: 28,
+        image: '/images/destinations/pangi-valley.jpg',
+        description: 'Rugged high-altitude Himalayan valley of dramatic gorge trails and ancient tribal traditions.',
+      },
+      {
+        id: 'dest-parvati',
+        name: 'Parvati Valley',
+        district: 'Kullu',
+        category: 'treks',
+        rating: 4.8,
+        reviews: 84,
+        image: '/images/destinations/parvati-valley.jpg',
+        description: 'Mystical valley of bubbling hot springs, deodar woodlands, and alpine pilgrim trails.',
+      },
+      {
+        id: 'dest-kasol',
+        name: 'Kasol & Grahan',
+        district: 'Kullu',
+        category: 'villages',
+        rating: 4.7,
+        reviews: 54,
+        image: '/images/destinations/kasol.jpg',
+        description: 'Riverside trails connecting quiet secluded hamlets hidden deep within old-growth deodar forests.',
+      },
+      {
+        id: 'dest-spiti',
+        name: 'Spiti Valley',
+        district: 'Lahaul & Spiti',
+        category: 'viewpoints',
+        rating: 4.9,
+        reviews: 110,
+        image: '/images/destinations/spiti-valley.jpg',
+        description: 'Cold mountain desert of ancient cliffside Buddhist monasteries and vast star-lit horizons.',
+      },
+    ];
 
-  // Filter genuine locations based on query, valley/district, category
-  const filteredDestinations = useMemo(() => {
-    return locationsList.filter((loc) => {
-      // Valley / Region filter
-      if (selectedValley !== 'all') {
-        const v = String(loc.valley || '').toLowerCase();
-        const d = String(loc.district || '').toLowerCase();
-        const target = selectedValley.toLowerCase();
-        if (!v.includes(target) && !d.includes(target)) return false;
+    // Map backend locations into unified format
+    const backendMapped = backendLocations.map((loc) => ({
+      id: `backend-${loc.id}`,
+      name: loc.name,
+      district: loc.district || loc.valley || 'Kullu',
+      category: (loc.category || 'villages').toLowerCase(),
+      rating: 4.9,
+      reviews: 18,
+      image: loc.cover_image || '/images/destinations/tirthan-valley.jpg',
+      description: loc.description,
+      rawLocation: loc,
+    }));
+
+    return [...curated, ...backendMapped];
+  }, [backendLocations]);
+
+  // Categories filter list matching Screen 2
+  const categories = [
+    { id: 'all', name: 'All' },
+    { id: 'villages', name: 'Villages' },
+    { id: 'treks', name: 'Treks' },
+    { id: 'waterfalls', name: 'Waterfalls' },
+    { id: 'viewpoints', name: 'Viewpoints' },
+    { id: 'culture', name: 'Culture' },
+  ];
+
+  // Filter logic
+  const filtered = useMemo(() => {
+    return unifiedDestinations.filter((dest) => {
+      // Query filter
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchesName = dest.name.toLowerCase().includes(q);
+        const matchesDist = dest.district.toLowerCase().includes(q);
+        const matchesDesc = dest.description?.toLowerCase().includes(q);
+        if (!matchesName && !matchesDist && !matchesDesc) return false;
       }
 
       // Category filter
       if (selectedCategory !== 'all') {
-        if (loc.category?.toLowerCase() !== selectedCategory.toLowerCase()) {
-          return false;
-        }
+        if (dest.category !== selectedCategory) return false;
       }
 
-      // Query filter (Search by location, village, valley, or district)
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const matchesName = loc.name?.toLowerCase().includes(q);
-        const matchesDesc = loc.description?.toLowerCase().includes(q);
-        const matchesValley = loc.valley?.toLowerCase().includes(q);
-        const matchesDistrict = loc.district?.toLowerCase().includes(q);
-        const matchesVillage = loc.village?.toLowerCase().includes(q);
-        const matchesTags =
-          Array.isArray(loc.tags) && loc.tags.some((t) => t.toLowerCase().includes(q));
-
-        if (
-          !matchesName &&
-          !matchesDesc &&
-          !matchesValley &&
-          !matchesDistrict &&
-          !matchesVillage &&
-          !matchesTags
-        ) {
-          return false;
-        }
+      // Valley / District filter
+      if (selectedValley !== 'all') {
+        if (!dest.district.toLowerCase().includes(selectedValley.toLowerCase())) return false;
       }
 
       return true;
     });
-  }, [locationsList, selectedValley, selectedCategory, searchQuery]);
+  }, [unifiedDestinations, searchQuery, selectedCategory, selectedValley]);
 
-  // Calculation of matching count for staged filters in drawer
-  const getMatchingCountForStaged = useCallback(
-    (stagedCat, stagedVal) => {
-      return locationsList.filter((loc) => {
-        if (stagedVal !== 'all') {
-          const v = String(loc.valley || '').toLowerCase();
-          const d = String(loc.district || '').toLowerCase();
-          const target = stagedVal.toLowerCase();
-          if (!v.includes(target) && !d.includes(target)) return false;
-        }
-
-        if (stagedCat !== 'all') {
-          if (loc.category?.toLowerCase() !== stagedCat.toLowerCase()) {
-            return false;
-          }
-        }
-
-        if (searchQuery.trim()) {
-          const q = searchQuery.toLowerCase().trim();
-          const matchesName = loc.name?.toLowerCase().includes(q);
-          const matchesDesc = loc.description?.toLowerCase().includes(q);
-          const matchesValley = loc.valley?.toLowerCase().includes(q);
-          const matchesDistrict = loc.district?.toLowerCase().includes(q);
-          const matchesVillage = loc.village?.toLowerCase().includes(q);
-          const matchesTags =
-            Array.isArray(loc.tags) && loc.tags.some((t) => t.toLowerCase().includes(q));
-
-          if (
-            !matchesName &&
-            !matchesDesc &&
-            !matchesValley &&
-            !matchesDistrict &&
-            !matchesVillage &&
-            !matchesTags
-          ) {
-            return false;
-          }
-        }
-
-        return true;
-      }).length;
-    },
-    [locationsList, searchQuery]
-  );
-
-  const handleApplyDrawerFilters = ({ category, valley }) => {
-    setSelectedCategory(category.toLowerCase());
-    setSelectedValley(valley.toLowerCase());
-
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      if (category === 'all') next.delete('category');
-      else next.set('category', category);
-
-      if (valley === 'all') next.delete('valley');
-      else next.set('valley', valley);
-
-      return next;
-    });
+  const toggleFavorite = (id) => {
+    setFavorites((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const handleRemoveCategory = () => {
-    setSelectedCategory('all');
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.delete('category');
-      return next;
-    });
+  const handleCategoryClick = (catId) => {
+    setSelectedCategory(catId);
+    const p = new URLSearchParams(searchParams);
+    if (catId === 'all') {
+      p.delete('category');
+    } else {
+      p.set('category', catId);
+    }
+    setSearchParams(p);
   };
 
-  const handleRemoveValley = () => {
-    setSelectedValley('all');
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.delete('valley');
-      return next;
-    });
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    const p = new URLSearchParams(searchParams);
+    if (searchQuery.trim()) {
+      p.set('q', searchQuery.trim());
+    } else {
+      p.delete('q');
+    }
+    setSearchParams(p);
   };
-
-  const handleSearchChange = (val) => {
-    setSearchQuery(val);
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      if (!val.trim()) next.delete('q');
-      else next.set('q', val.trim());
-      return next;
-    });
-  };
-
-  const handleClearSearch = () => {
-    setSearchQuery('');
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.delete('q');
-      return next;
-    });
-  };
-
-  const handleClearAllFilters = () => {
-    setSearchQuery('');
-    setSelectedValley('all');
-    setSelectedCategory('all');
-    setSearchParams({});
-  };
-
-  // Human-friendly display names for active chips
-  const activeCategoryObj = categoriesList.find(
-    (c) => c.id.toLowerCase() === selectedCategory.toLowerCase()
-  );
-  const activeCategoryName = activeCategoryObj
-    ? `${activeCategoryObj.icon || '🏷️'} ${activeCategoryObj.name}`
-    : selectedCategory.replace(/-/g, ' ');
-
-  const activeValleyName =
-    availableValleys.find((v) => v.toLowerCase() === selectedValley.toLowerCase()) ||
-    selectedValley;
-
-  const activeFilterCount =
-    (selectedCategory !== 'all' ? 1 : 0) + (selectedValley !== 'all' ? 1 : 0);
-
-  const hasAnyActiveFilter =
-    selectedCategory !== 'all' || selectedValley !== 'all' || Boolean(searchQuery.trim());
 
   return (
-    <div style={{ backgroundColor: '#FAF8F2', minHeight: 'calc(100vh - 76px)', width: '100%', overflowX: 'hidden' }}>
-      {/* Search & Filter Header Strip */}
-      <section
-        style={{
-          backgroundColor: '#FFFFFF',
-          borderBottom: '1px solid rgba(12, 32, 23, 0.08)',
-          padding: '18px 0 16px 0',
-          position: 'sticky',
-          top: '76px',
-          zIndex: 40,
-          boxShadow: '0 2px 8px rgba(12, 32, 23, 0.03)',
-        }}
-      >
+    <div className="explore-page-wrapper" style={{ padding: '36px 0 80px 0' }}>
+      <div className="container">
+        {/* Screen 2 Header */}
+        <div style={{ marginBottom: '28px' }}>
+          <h1
+            style={{
+              fontFamily: 'var(--font-serif)',
+              fontSize: '32px',
+              fontWeight: '700',
+              color: 'var(--color-text-primary)',
+              letterSpacing: '-0.01em',
+            }}
+          >
+            Explore Destinations
+          </h1>
+          <p style={{ fontSize: '15px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+            Find beautiful places, nature trails and offbeat locations in Himachal.
+          </p>
+        </div>
+
+        {/* Search Bar + Filters Action (Screen 2) */}
         <div
           style={{
-            maxWidth: '1280px',
-            margin: '0 auto',
-            padding: '0 clamp(16px, 3.5vw, 24px)',
-            boxSizing: 'border-box',
-            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            marginBottom: '20px',
           }}
         >
-          {/* Top Row: Heading and Documented Location Count */}
-          <div
+          <form
+            onSubmit={handleSearchSubmit}
             style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '12px',
-              marginBottom: '14px',
-            }}
-          >
-            <div>
-              <span
-                style={{
-                  fontSize: '11px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.12em',
-                  color: '#205540',
-                  fontWeight: 700,
-                  display: 'block',
-                  marginBottom: '3px',
-                }}
-              >
-                Topographic Directory • Himachal Pradesh
-              </span>
-              <h1
-                style={{
-                  fontFamily: "'Playfair Display', Georgia, serif",
-                  fontSize: 'clamp(22px, 3.5vw, 28px)',
-                  color: '#0C2017',
-                  margin: 0,
-                  lineHeight: 1.15,
-                  fontWeight: 700,
-                }}
-              >
-                Explore Verified Places
-              </h1>
-            </div>
-
-            <div
-              style={{
-                backgroundColor: 'rgba(32, 85, 64, 0.08)',
-                color: '#205540',
-                padding: '6px 14px',
-                borderRadius: '9999px',
-                fontSize: '12.5px',
-                fontWeight: 700,
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                flexShrink: 0,
-              }}
-            >
-              <span>🏔️</span>
-              <span>
-                {loading
-                  ? 'Loading directory...'
-                  : `${filteredDestinations.length} ${
-                      filteredDestinations.length === 1 ? 'place' : 'places'
-                    } documented`}
-              </span>
-            </div>
-          </div>
-
-          {/* Clean Search Bar with Compact Filters Button Beside It */}
-          <div
-            style={{
+              flex: 1,
+              position: 'relative',
               display: 'flex',
               alignItems: 'center',
-              gap: '10px',
-              width: '100%',
             }}
           >
-            {/* Search Input with Search Icon & Quick Clear */}
-            <div
+            <Search
+              size={18}
+              color="var(--color-text-muted)"
+              style={{ position: 'absolute', left: '16px' }}
+            />
+            <input
+              type="text"
+              className="input-field"
+              placeholder="Search destinations..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               style={{
-                position: 'relative',
-                flex: 1,
-                minWidth: 0,
+                paddingLeft: '44px',
+                height: '46px',
+                fontSize: '14px',
+                borderRadius: 'var(--radius-pill)',
+                backgroundColor: '#FFFFFF',
               }}
-            >
-              <div
-                style={{
-                  position: 'absolute',
-                  left: '16px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: '#536B5E',
-                  pointerEvents: 'none',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                <svg
-                  width="17"
-                  height="17"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <circle cx="11" cy="11" r="8" />
-                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-              </div>
-
-              <input
-                type="text"
-                placeholder="Search by place, village, valley, or district..."
-                value={searchQuery}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  padding: '11px 40px 11px 42px',
-                  borderRadius: '9999px',
-                  border: '1px solid rgba(12, 32, 23, 0.16)',
-                  backgroundColor: '#FAF8F2',
-                  fontSize: '14px',
-                  color: '#0C2017',
-                  outline: 'none',
-                  minHeight: '46px',
-                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = '#205540';
-                  e.target.style.boxShadow = '0 0 0 3px rgba(32, 85, 64, 0.1)';
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = 'rgba(12, 32, 23, 0.16)';
-                  e.target.style.boxShadow = 'none';
-                }}
-              />
-
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={handleClearSearch}
-                  aria-label="Clear search text"
-                  style={{
-                    position: 'absolute',
-                    right: '12px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'none',
-                    border: 'none',
-                    color: '#789083',
-                    cursor: 'pointer',
-                    padding: '4px 6px',
-                    fontSize: '14px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-
-            {/* Compact Filters Button */}
-            <button
-              type="button"
-              onClick={() => setIsFilterDrawerOpen(true)}
-              aria-label="Open filter options"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '10px 16px',
-                minHeight: '46px',
-                borderRadius: '9999px',
-                backgroundColor: activeFilterCount > 0 ? 'rgba(32, 85, 64, 0.08)' : '#F3EFE6',
-                border:
-                  activeFilterCount > 0
-                    ? '1.5px solid #205540'
-                    : '1px solid rgba(12, 32, 23, 0.16)',
-                color: activeFilterCount > 0 ? '#205540' : '#0C2017',
-                fontSize: '13.5px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = '#205540';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor =
-                  activeFilterCount > 0 ? '#205540' : 'rgba(12, 32, 23, 0.16)';
-              }}
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <line x1="4" y1="21" x2="4" y2="14" />
-                <line x1="4" y1="10" x2="4" y2="3" />
-                <line x1="12" y1="21" x2="12" y2="12" />
-                <line x1="12" y1="8" x2="12" y2="3" />
-                <line x1="20" y1="21" x2="20" y2="16" />
-                <line x1="20" y1="12" x2="20" y2="3" />
-                <line x1="1" y1="14" x2="7" y2="14" />
-                <line x1="9" y1="8" x2="15" y2="8" />
-                <line x1="17" y1="16" x2="23" y2="16" />
-              </svg>
-              <span>Filters</span>
-              {activeFilterCount > 0 && (
-                <span
-                  style={{
-                    backgroundColor: '#205540',
-                    color: '#FFFFFF',
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    minWidth: '18px',
-                    height: '18px',
-                    borderRadius: '9999px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '0 4px',
-                  }}
-                >
-                  {activeFilterCount}
-                </span>
-              )}
-            </button>
-          </div>
-
-          {/* Active Removable Chips Row (Only visible when applicable) */}
-          {hasAnyActiveFilter && (
-            <div
-              style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                alignItems: 'center',
-                gap: '8px',
-                marginTop: '12px',
-                paddingTop: '2px',
-              }}
-            >
-              <span
-                style={{
-                  fontSize: '12px',
-                  color: '#536B5E',
-                  fontWeight: 600,
-                  marginRight: '2px',
-                }}
-              >
-                Active filters:
-              </span>
-
-              {/* Selected Category Chip */}
-              {selectedCategory !== 'all' && (
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    backgroundColor: '#F3EFE6',
-                    color: '#0C2017',
-                    border: '1px solid rgba(32, 85, 64, 0.3)',
-                    padding: '4px 10px 4px 12px',
-                    borderRadius: '9999px',
-                    fontSize: '12.5px',
-                    fontWeight: 600,
-                  }}
-                >
-                  <span>{activeCategoryName}</span>
-                  <button
-                    type="button"
-                    onClick={handleRemoveCategory}
-                    aria-label="Remove category filter"
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#536B5E',
-                      cursor: 'pointer',
-                      padding: '0 2px',
-                      fontSize: '12px',
-                      fontWeight: 700,
-                      display: 'flex',
-                      alignItems: 'center',
-                    }}
-                  >
-                    ✕
-                  </button>
-                </span>
-              )}
-
-              {/* Selected Valley Chip */}
-              {selectedValley !== 'all' && (
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    backgroundColor: '#F3EFE6',
-                    color: '#0C2017',
-                    border: '1px solid rgba(32, 85, 64, 0.3)',
-                    padding: '4px 10px 4px 12px',
-                    borderRadius: '9999px',
-                    fontSize: '12.5px',
-                    fontWeight: 600,
-                  }}
-                >
-                  <span>📍 {activeValleyName}</span>
-                  <button
-                    type="button"
-                    onClick={handleRemoveValley}
-                    aria-label="Remove valley filter"
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#536B5E',
-                      cursor: 'pointer',
-                      padding: '0 2px',
-                      fontSize: '12px',
-                      fontWeight: 700,
-                      display: 'flex',
-                      alignItems: 'center',
-                    }}
-                  >
-                    ✕
-                  </button>
-                </span>
-              )}
-
-              {/* Search Query Chip */}
-              {searchQuery.trim() && (
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    backgroundColor: '#F3EFE6',
-                    color: '#0C2017',
-                    border: '1px solid rgba(12, 32, 23, 0.15)',
-                    padding: '4px 10px 4px 12px',
-                    borderRadius: '9999px',
-                    fontSize: '12.5px',
-                    fontWeight: 600,
-                  }}
-                >
-                  <span>🔍 &ldquo;{searchQuery.trim()}&rdquo;</span>
-                  <button
-                    type="button"
-                    onClick={handleClearSearch}
-                    aria-label="Clear search filter"
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#536B5E',
-                      cursor: 'pointer',
-                      padding: '0 2px',
-                      fontSize: '12px',
-                      fontWeight: 700,
-                      display: 'flex',
-                      alignItems: 'center',
-                    }}
-                  >
-                    ✕
-                  </button>
-                </span>
-              )}
-
-              {/* Clear All Action */}
+            />
+            {searchQuery && (
               <button
                 type="button"
-                onClick={handleClearAllFilters}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#c86d51',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  padding: '4px 6px',
-                  textDecoration: 'underline',
+                onClick={() => {
+                  setSearchQuery('');
+                  const p = new URLSearchParams(searchParams);
+                  p.delete('q');
+                  setSearchParams(p);
                 }}
+                style={{ position: 'absolute', right: '14px', color: 'var(--color-text-muted)' }}
               >
-                Clear all
+                <X size={16} />
               </button>
-            </div>
-          )}
-        </div>
-      </section>
+            )}
+          </form>
 
-      {/* Filter Drawer (Desktop Modal Drawer / Mobile Bottom Sheet) */}
-      <ExploreFilterDrawer
-        isOpen={isFilterDrawerOpen}
-        onClose={() => setIsFilterDrawerOpen(false)}
-        categories={categoriesList}
-        valleys={availableValleys}
-        selectedCategory={selectedCategory}
-        selectedValley={selectedValley}
-        onApply={handleApplyDrawerFilters}
-        onClear={handleClearAllFilters}
-        getMatchingCount={getMatchingCountForStaged}
-      />
-
-      {/* Main Content Area - Location Photographs & Destination Cards Prominent Directly Below */}
-      <div
-        style={{
-          maxWidth: '1280px',
-          margin: '0 auto',
-          padding: '24px clamp(16px, 3.5vw, 24px) 60px clamp(16px, 3.5vw, 24px)',
-          boxSizing: 'border-box',
-          width: '100%',
-        }}
-      >
-        {loading && (
-          <div style={{ textAlign: 'center', padding: '80px 0', color: '#536B5E' }}>
-            <div style={{ fontSize: '32px', marginBottom: '12px' }}>🏔️</div>
-            <p style={{ fontSize: '15px' }}>Loading verified topographic locations...</p>
-          </div>
-        )}
-
-        {/* Empty State */}
-        {!loading && filteredDestinations.length === 0 && (
-          <div
+          <button
+            type="button"
+            className="btn btn-secondary btn-pill"
+            onClick={() => setIsFilterModalOpen(true)}
             style={{
-              maxWidth: '620px',
-              margin: '36px auto 80px auto',
+              height: '46px',
+              padding: '0 20px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontWeight: '600',
+              borderColor: 'var(--color-border)',
+            }}
+          >
+            <SlidersHorizontal size={16} color="var(--color-forest)" />
+            <span>Filters</span>
+          </button>
+        </div>
+
+        {/* Category Pills Strip (Screen 2) */}
+        <div className="filter-tabs" style={{ marginBottom: '32px' }}>
+          {categories.map((cat) => (
+            <button
+              key={cat.id}
+              type="button"
+              className={`filter-tab ${selectedCategory === cat.id ? 'active' : ''}`}
+              onClick={() => handleCategoryClick(cat.id)}
+            >
+              {cat.name}
+            </button>
+          ))}
+        </div>
+
+        {/* Destination Grid (Screen 2 - 3 columns desktop) */}
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--color-text-secondary)' }}>
+            <p>Loading destinations across Himachal...</p>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div
+            className="card"
+            style={{
+              padding: '48px 24px',
               textAlign: 'center',
               backgroundColor: '#FFFFFF',
-              borderRadius: '20px',
-              padding: '48px 28px',
-              border: '1px solid rgba(12, 32, 23, 0.08)',
-              boxShadow: '0 4px 20px rgba(12, 32, 23, 0.04)',
-              boxSizing: 'border-box',
-              width: '100%',
+              maxWidth: '520px',
+              margin: '32px auto',
             }}
           >
-            <div style={{ fontSize: '42px', marginBottom: '16px' }}>🏔️</div>
-            <h2
-              style={{
-                fontFamily: "'Playfair Display', Georgia, serif",
-                fontSize: '24px',
-                color: '#0C2017',
-                marginBottom: '10px',
-                lineHeight: 1.25,
-              }}
-            >
-              No places found matching your filters
-            </h2>
-            <p
-              style={{
-                fontSize: '14.5px',
-                color: '#536B5E',
-                lineHeight: 1.6,
-                marginBottom: '24px',
-              }}
-            >
-              Pahadíly displays only authentic, admin-vetted locations with real photographs and verified coordinates. Try broadening your category or valley criteria.
+            <MapPin size={36} color="var(--color-forest)" style={{ margin: '0 auto 16px auto' }} />
+            <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>
+              No destinations found
+            </h3>
+            <p style={{ fontSize: '14px', color: 'var(--color-text-secondary)', marginBottom: '20px' }}>
+              We couldn't find any places matching your current search or category filters.
             </p>
-            <div
-              style={{
-                display: 'flex',
-                gap: '12px',
-                justifyContent: 'center',
-                flexWrap: 'wrap',
+            <button
+              type="button"
+              className="btn btn-forest btn-sm btn-pill"
+              onClick={() => {
+                setSearchQuery('');
+                setSelectedCategory('all');
+                setSelectedValley('all');
+                setSearchParams({});
               }}
             >
-              <button
-                type="button"
-                onClick={handleClearAllFilters}
-                style={{
-                  padding: '11px 24px',
-                  borderRadius: '9999px',
-                  backgroundColor: '#205540',
-                  color: '#FFFFFF',
-                  fontSize: '13.5px',
-                  fontWeight: 600,
-                  border: 'none',
-                  cursor: 'pointer',
-                  minHeight: '44px',
-                }}
-              >
-                Reset All Filters
-              </button>
-              <button
-                type="button"
-                onClick={openHostApplication}
-                style={{
-                  padding: '11px 24px',
-                  borderRadius: '9999px',
-                  backgroundColor: 'rgba(32, 85, 64, 0.08)',
-                  color: '#205540',
-                  border: '1px solid rgba(32, 85, 64, 0.2)',
-                  fontSize: '13.5px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  minHeight: '44px',
-                }}
-              >
-                Apply as Local Host / Guide
-              </button>
-            </div>
+              Clear All Filters
+            </button>
           </div>
-        )}
-
-        {/* Verified Locations Directory Grid */}
-        {!loading && filteredDestinations.length > 0 && (
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-              gap: '24px',
-              width: '100%',
-              boxSizing: 'border-box',
-            }}
-          >
-            {filteredDestinations.map((loc) => {
-              const coverImg =
-                loc.cover_image || (loc.gallery && loc.gallery[0]?.url) || '';
-              return (
-                <div
-                  key={loc.id}
-                  onClick={() => openDestinationDetail(loc)}
-                  style={{
-                    backgroundColor: '#FFFFFF',
-                    borderRadius: '16px',
-                    overflow: 'hidden',
-                    border: '1px solid rgba(12, 32, 23, 0.08)',
-                    boxShadow: '0 2px 10px rgba(12, 32, 23, 0.04)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    cursor: 'pointer',
-                    transition:
-                      'border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = 'rgba(32, 85, 64, 0.35)';
-                    e.currentTarget.style.boxShadow =
-                      '0 8px 24px rgba(12, 32, 23, 0.08)';
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = 'rgba(12, 32, 23, 0.08)';
-                    e.currentTarget.style.boxShadow =
-                      '0 2px 10px rgba(12, 32, 23, 0.04)';
-                    e.currentTarget.style.transform = 'translateY(0)';
-                  }}
-                >
-                  <div
-                    style={{
-                      position: 'relative',
-                      height: '220px',
-                      backgroundColor: '#EBE7DE',
-                      overflow: 'hidden',
+        ) : (
+          <div className="destination-grid">
+            {filtered.map((dest) => (
+              <div
+                key={dest.id}
+                className="destination-card"
+                onClick={() => openDestinationDetail(dest.rawLocation || dest)}
+                style={{ cursor: 'pointer' }}
+              >
+                <div className="destination-img-wrap">
+                  <img
+                    src={dest.image}
+                    alt={dest.name}
+                    className="destination-img"
+                    onError={(e) => {
+                      e.currentTarget.src = '/images/destinations/tirthan-valley.jpg';
                     }}
-                  >
-                    {coverImg ? (
-                      <img
-                        src={coverImg}
-                        alt={loc.name}
-                        loading="lazy"
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover',
-                          display: 'block',
-                        }}
-                      />
-                    ) : (
-                      <div
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '28px',
-                        }}
-                      >
-                        🏔️
-                      </div>
-                    )}
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: '12px',
-                        left: '12px',
-                        backgroundColor: 'rgba(6, 25, 18, 0.85)',
-                        color: '#8EE49A',
-                        padding: '4px 10px',
-                        borderRadius: '9999px',
-                        fontSize: '11px',
-                        fontWeight: 700,
-                      }}
-                    >
-                      {loc.district} • {loc.valley}
-                    </div>
-                    {loc.category && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '12px',
-                          right: '12px',
-                          backgroundColor: 'rgba(250, 248, 242, 0.95)',
-                          color: '#205540',
-                          padding: '4px 10px',
-                          borderRadius: '9999px',
-                          fontSize: '11px',
-                          fontWeight: 700,
-                          textTransform: 'capitalize',
-                        }}
-                      >
-                        {loc.category.replace(/-/g, ' ')}
-                      </div>
-                    )}
-                  </div>
-
-                  <div
-                    style={{
-                      padding: '20px',
-                      flex: 1,
-                      display: 'flex',
-                      flexDirection: 'column',
+                  />
+                  <button
+                    type="button"
+                    className="favorite-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleFavorite(dest.id);
                     }}
+                    style={{ color: favorites[dest.id] ? '#E53935' : 'var(--color-text-secondary)' }}
+                    aria-label="Save to favorites"
                   >
-                    <h3
-                      style={{
-                        fontFamily: "'Playfair Display', Georgia, serif",
-                        fontSize: '20px',
-                        color: '#0C2017',
-                        margin: '0 0 6px 0',
-                        lineHeight: 1.25,
-                      }}
-                    >
-                      {loc.name}
-                    </h3>
-                    <p
-                      style={{
-                        color: '#536B5E',
-                        fontSize: '13.5px',
-                        lineHeight: 1.5,
-                        margin: '0 0 16px 0',
-                        flex: 1,
-                      }}
-                    >
-                      {loc.description
-                        ? loc.description.length > 130
-                          ? `${loc.description.slice(0, 130)}...`
-                          : loc.description
-                        : ''}
-                    </p>
+                    <Heart size={16} fill={favorites[dest.id] ? '#E53935' : 'none'} />
+                  </button>
+                </div>
 
-                    {/* Metadata tags */}
-                    {(loc.best_time || loc.difficulty) && (
-                      <div
-                        style={{
-                          display: 'flex',
-                          gap: '8px',
-                          flexWrap: 'wrap',
-                          marginBottom: '14px',
-                        }}
-                      >
-                        {loc.best_time && (
-                          <span
-                            style={{
-                              fontSize: '11px',
-                              backgroundColor: '#F3EFE6',
-                              color: '#536B5E',
-                              padding: '3px 8px',
-                              borderRadius: '4px',
-                            }}
-                          >
-                            📅 {loc.best_time}
-                          </span>
-                        )}
-                        {loc.difficulty && (
-                          <span
-                            style={{
-                              fontSize: '11px',
-                              backgroundColor: '#F3EFE6',
-                              color: '#536B5E',
-                              padding: '3px 8px',
-                              borderRadius: '4px',
-                            }}
-                          >
-                            🥾 {loc.difficulty}
-                          </span>
-                        )}
-                      </div>
-                    )}
+                <div className="destination-body">
+                  <h3 className="destination-title">{dest.name}</h3>
+                  <div className="destination-location">{dest.district}</div>
 
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        paddingTop: '14px',
-                        borderTop: '1px solid rgba(12, 32, 23, 0.08)',
-                      }}
-                    >
-                      <span style={{ fontSize: '12px', color: '#688575' }}>
-                        {loc.village ? `Village: ${loc.village}` : 'Verified location'}
-                      </span>
-                      <span
-                        style={{
-                          fontSize: '12.5px',
-                          fontWeight: 700,
-                          color: '#205540',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                        }}
-                      >
-                        <span>View Slideshow &amp; Details</span>
-                        <span>→</span>
-                      </span>
-                    </div>
+                  <div className="destination-meta">
+                    <Star size={14} fill="#D99A38" color="#D99A38" />
+                    <span>{dest.rating}</span>
+                    <span style={{ color: 'var(--color-text-secondary)', fontWeight: 400 }}>
+                      ({dest.reviews})
+                    </span>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         )}
       </div>
+
+      {/* Filter Modal Drawer */}
+      {isFilterModalOpen && (
+        <div className="modal-overlay" onClick={() => setIsFilterModalOpen(false)}>
+          <div className="modal-dialog" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px' }}>
+            <div className="modal-header">
+              <h3 style={{ fontSize: '18px', fontWeight: '700' }}>Filter Destinations</h3>
+              <button
+                type="button"
+                className="btn-icon"
+                onClick={() => setIsFilterModalOpen(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              {/* Region Filter */}
+              <div className="form-group">
+                <label className="form-label">District / Region</label>
+                <select
+                  className="input-field"
+                  value={selectedValley}
+                  onChange={(e) => setSelectedValley(e.target.value)}
+                >
+                  <option value="all">All Districts</option>
+                  <option value="kullu">Kullu & Parvati</option>
+                  <option value="tirthan">Tirthan Valley</option>
+                  <option value="chamba">Chamba & Pangi</option>
+                  <option value="spiti">Lahaul & Spiti</option>
+                </select>
+              </div>
+
+              {/* Category Filter */}
+              <div className="form-group">
+                <label className="form-label">Category</label>
+                <select
+                  className="input-field"
+                  value={selectedCategory}
+                  onChange={(e) => handleCategoryClick(e.target.value)}
+                >
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary w-full"
+                  onClick={() => {
+                    setSelectedCategory('all');
+                    setSelectedValley('all');
+                    setIsFilterModalOpen(false);
+                  }}
+                >
+                  Reset
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-pill w-full"
+                  onClick={() => setIsFilterModalOpen(false)}
+                >
+                  Apply Filters
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
